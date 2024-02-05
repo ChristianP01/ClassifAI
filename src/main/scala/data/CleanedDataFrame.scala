@@ -1,24 +1,20 @@
 package data
 
 import org.apache.spark.ml.feature.{StopWordsRemover, Tokenizer}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{not, regexp_replace}
 
-class CleanedDataFrame() {
-  // Insert your dataset path here
-  private val filePath = "./src/main/assets/Context.csv"
+class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
 
-  // Start Spark session
-  private val spark = SparkSession
-    .builder
-    .appName("ClassifAI")
-    .master("local[1]")
-    .getOrCreate()
+  this.removeTopicErrors().removeForeignSentences().removePunctuations().tokenize().removeStopWords()
 
-  private var df = spark.read.option("header", value = true).csv(this.filePath)
+  /** Get the transformed dataframe */
+  def getDataFrame: DataFrame = {
+    df
+  }
 
-  // Remove rows with not allowed topics
-  def removeTopicErrors(): CleanedDataFrame = {
+  /** Remove rows with not allowed topics */
+  private def removeTopicErrors(): CleanedDataFrame = {
     val topics = List(
       "Animals",
       "Compliment",
@@ -38,8 +34,8 @@ class CleanedDataFrame() {
     this
   }
 
-  // Remove rows with non-English sentences
-  def removeForeignSentences(): CleanedDataFrame = {
+  /** Remove rows with non-English sentences */
+  private def removeForeignSentences(): CleanedDataFrame = {
     val notAlph: String = "[a-zA-Z]"
     val accents: String = "[àáâãäåçèéêëìíîïòóôõöùúûü]"
     val notAlphDF = df.filter(not(df.col("Text").rlike(notAlph)))
@@ -51,8 +47,8 @@ class CleanedDataFrame() {
     this
   }
 
-  // Remove punctuations and multiple whitespace
-  def removePunctuations(): CleanedDataFrame = {
+  /** Remove punctuations and multiple whitespace */
+  private def removePunctuations(): CleanedDataFrame = {
 
     this.df = df
       .withColumn("NoSymbols", regexp_replace(df.col("Text"), "[^a-zA-Z\\s]", ""))
@@ -65,8 +61,8 @@ class CleanedDataFrame() {
     this
   }
 
-  // Transform texts in list of tokens
-  def tokenize(): CleanedDataFrame = {
+  /** Transform texts in list of tokens */
+  private def tokenize(): CleanedDataFrame = {
     val tokenizer = new Tokenizer()
       .setInputCol("NoPunct")
       .setOutputCol("Tokens")
@@ -78,17 +74,15 @@ class CleanedDataFrame() {
     this
   }
 
-  // Remove stop words
-  def removeStopWords(): CleanedDataFrame = {
+  /** Remove stop words */
+  private def removeStopWords(): CleanedDataFrame = {
     val remover = new StopWordsRemover()
       .setInputCol("Tokens")
-      .setOutputCol("Filtered")
+      .setOutputCol("Text")
 
     this.df = remover
       .transform(this.df)
       .drop("Tokens")
-
-    this.df.show()
 
     this
   }
