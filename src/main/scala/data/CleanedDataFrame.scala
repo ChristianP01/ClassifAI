@@ -1,14 +1,14 @@
 package data
 
-import scala.io.Source
 import org.apache.spark.ml.feature.{StopWordsRemover, Tokenizer}
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{not, regexp_replace, udf}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{not, regexp_replace}
 
 class CleanedDataFrame() {
   // Insert your dataset path here
   private val filePath = "./src/main/assets/Context.csv"
 
+  // Start Spark session
   private val spark = SparkSession
     .builder
     .appName("ClassifAI")
@@ -17,8 +17,8 @@ class CleanedDataFrame() {
 
   private var df = spark.read.option("header", value = true).csv(this.filePath)
 
+  // Remove rows with not allowed topics
   def removeTopicErrors(): CleanedDataFrame = {
-
     val topics = List(
       "Animals",
       "Compliment",
@@ -38,17 +38,20 @@ class CleanedDataFrame() {
     this
   }
 
+  // Remove rows with non-English sentences
   def removeForeignSentences(): CleanedDataFrame = {
     val notAlph: String = "[a-zA-Z]"
     val accents: String = "[àáâãäåçèéêëìíîïòóôõöùúûü]"
     val notAlphDF = df.filter(not(df.col("Text").rlike(notAlph)))
     val accentsDF = df.filter(df.col("Text").rlike(accents))
     val foreignDF = notAlphDF.unionByName(accentsDF, allowMissingColumns = true)
+
     this.df = this.df.except(foreignDF)
 
     this
   }
 
+  // Remove punctuations and multiple whitespace
   def removePunctuations(): CleanedDataFrame = {
 
     this.df = df
@@ -62,6 +65,7 @@ class CleanedDataFrame() {
     this
   }
 
+  // Transform texts in list of tokens
   def tokenize(): CleanedDataFrame = {
     val tokenizer = new Tokenizer()
       .setInputCol("NoPunct")
@@ -74,6 +78,7 @@ class CleanedDataFrame() {
     this
   }
 
+  // Remove stop words
   def removeStopWords(): CleanedDataFrame = {
     val remover = new StopWordsRemover()
       .setInputCol("Tokens")
