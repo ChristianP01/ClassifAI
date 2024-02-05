@@ -3,7 +3,7 @@ package data
 import scala.io.Source
 import org.apache.spark.ml.feature.{StopWordsRemover, Tokenizer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{regexp_replace, udf}
+import org.apache.spark.sql.functions.{not, regexp_replace, udf}
 
 class CleanedDataFrame() {
   // Insert your dataset path here
@@ -38,7 +38,19 @@ class CleanedDataFrame() {
     this
   }
 
+  def removeForeignSentences(): CleanedDataFrame = {
+    val notAlph: String = "[a-zA-Z]"
+    val accents: String = "[àáâãäåçèéêëìíîïòóôõöùúûü]"
+    val notAlphDF = df.filter(not(df.col("Text").rlike(notAlph)))
+    val accentsDF = df.filter(df.col("Text").rlike(accents))
+    val foreignDF = notAlphDF.unionByName(accentsDF, allowMissingColumns = true)
+    this.df = this.df.except(foreignDF)
+
+    this
+  }
+
   def removePunctuations(): CleanedDataFrame = {
+
     this.df = df
       .withColumn("NoSymbols", regexp_replace(df.col("Text"), "[^a-zA-Z\\s]", ""))
       .drop("Text")
@@ -72,6 +84,7 @@ class CleanedDataFrame() {
       .drop("Tokens")
 
     this.df.show()
+
     this
   }
 }

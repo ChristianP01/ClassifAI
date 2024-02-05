@@ -4,6 +4,6 @@ object Main {
   def main(args: Array[String]): Unit = {
     val df = new CleanedDataFrame()
 
-    df.removeTopicErrors().removePunctuations().tokenize().removeStopWords()
+    df.removeTopicErrors().removeForeignSentences().removePunctuations().tokenize().removeStopWords()
   }
 }
