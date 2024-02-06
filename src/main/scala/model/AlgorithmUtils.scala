@@ -5,33 +5,41 @@ import org.apache.spark.sql.functions.col
 
 trait AlgorithmUtils {
   /** Compute the entropy */
-  private def entropy(df: DataFrame, classes: List[String]): Double = {
-    val S: Long = df.count()
-    val numClasses: List[Double] = classes.map(c => df.filter(df("Topic/Context") === c).count().toDouble / S)
-    numClasses.map(p => -p * this.log(p)).sum
+  protected def calcEntropy(df: DataFrame, classes: List[String]): (Double, Map[String, Double]) = {
+    val totalCount: Long = df.count()
+    var classMap: Map[String, Double] = Map.empty
+
+    classes.foreach( c =>
+      classMap += c -> df.filter(df("Topic/Context") === c).count().toDouble
+    )
+
+    // Return the total entropy and a map structured as [classType, numberOutcomes]
+    (classMap.map( c =>
+      -(c._2 / totalCount) * this.log2(c._2 / totalCount)
+    ).sum, classMap)
   }
 
   /** Compute the gain */
-  private def gain(unionSet: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
-    val S = unionSet.count()
-    val impurityBeforeSplit = entropy(unionSet, classes)
-    val weights = subsets.map(_.count().toDouble / S)
+  protected def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
+    val totalCount = df.count()
+    val impurityBeforeSplit = this.calcEntropy(df, classes)._1
+    val weights: List[Double] = subsets.map(_.count() / totalCount)
 
-    val impurityAfterSplit = weights.zip(subsets).map {
-      case (w, s) => w * entropy(s, classes)
+    val impurityAfterSplit: Double = weights.zip(subsets).map { obj =>
+      obj._1 * this.calcEntropy(obj._2, classes)._1
     }.sum
 
     impurityBeforeSplit - impurityAfterSplit
   }
 
   /** Returns the majority classes among dataset */
-  private def getMajorityClass(data: DataFrame, classes: List[String]): Int = {
+  protected def getMajorityClass(data: DataFrame, classes: List[String]): Int = {
     val numClasses: List[Int] = classes.map(c => data.filter(data("Topic/Context") === c).count().toInt)
     numClasses.max
   }
 
   /** Check if all instances in the dataset belong to the same class */
-  private def allSameClass(data: DataFrame): Boolean = {
+  protected def allSameClass(data: DataFrame): Boolean = {
     data.select("Topic/Context").distinct().count() == 1
   }
 
@@ -60,7 +68,7 @@ trait AlgorithmUtils {
     }
   }
 
-  private def log(num: Double): Double = {
+  protected def log2(num: Double): Double = {
     if (num == 0) {
       0
     } else {
