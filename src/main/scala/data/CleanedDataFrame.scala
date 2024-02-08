@@ -1,12 +1,20 @@
 package data
 
-import org.apache.spark.ml.feature.{StopWordsRemover, Tokenizer}
+import org.apache.spark.ml.feature.{HashingTF, IDF, StopWordsRemover, Tokenizer, Word2Vec}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{not, regexp_replace}
 
 class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
 
-  this.removeTopicErrors().removeForeignSentences().removePunctuations().tokenize().removeStopWords()
+  this
+    .removeTopicErrors()
+    .removeForeignSentences()
+    .removePunctuations()
+    .tokenize()
+    .removeStopWords()
+    .termFrequency()
+    .inverseDocumentFrequency()
+    .word2Vec()
 
   /** Get the transformed dataframe */
   def getDataFrame: DataFrame = {
@@ -83,6 +91,40 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     this.df = remover
       .transform(this.df)
       .drop("Tokens")
+
+    this
+  }
+
+  private def termFrequency(): CleanedDataFrame = {
+    val hashingTF = new HashingTF()
+      .setInputCol("Text")
+      .setOutputCol("TF")
+
+    this.df = hashingTF.transform(this.df)
+
+    this
+  }
+
+  private def inverseDocumentFrequency(): CleanedDataFrame = {
+    val idf = new IDF()
+      .setInputCol("TF")
+      .setOutputCol("IDF")
+
+    val idfModel = idf.fit(this.df)
+
+    this.df = idfModel.transform(this.df)
+
+    this
+  }
+
+  private def word2Vec(): CleanedDataFrame = {
+    val w2v = new Word2Vec()
+      .setInputCol("Text")
+      .setOutputCol("Word2Vec")
+
+    val w2vModel = w2v.fit(this.df)
+
+    this.df = w2vModel.transform(this.df)
 
     this
   }

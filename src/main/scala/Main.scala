@@ -20,5 +20,6 @@ object Main {
     df = preprocessor.getDataFrame
 
     df.show()
+    println(df.first())
   }
 }

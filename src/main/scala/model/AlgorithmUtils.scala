@@ -13,7 +13,7 @@ trait AlgorithmUtils {
       classMap += c -> df.filter(df("Topic/Context") === c).count().toDouble
     )
 
-    // Return the total entropy and a map structured as [classType, numberOutcomes]
+    // Return the total entropy and a map structured as [classType, classEntropy]
     (classMap.map( c =>
       -(c._2 / totalCount) * this.log2(c._2 / totalCount)
     ).sum, classMap)
@@ -51,12 +51,12 @@ trait AlgorithmUtils {
       LeafNode(classes(getMajorityClass(data, classes)))
     } else {
       val gains = attributes.map { attr =>
-        val groupedData = data.groupBy(attr).count()
-        val subsetGains = groupedData.collect().map { row =>
-          val attrValue = row.getString(0)
-          val subset = data.filter(col(attr) === attrValue)
-          gain(data, classes, List(subset))
-        }
+          val groupedData = data.groupBy(attr).count()
+          val subsetGains = groupedData.collect().map { row =>
+            val attrValue = row.getString(0)
+            val subset = data.filter(col(attr) === attrValue)
+            gain(data, classes, List(subset))
+          }
         (attr, subsetGains.sum)
       }
 
