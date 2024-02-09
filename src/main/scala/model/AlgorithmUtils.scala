@@ -43,6 +43,32 @@ trait AlgorithmUtils {
     data.select("Topic/Context").distinct().count() == 1
   }
 
+  /** Split nodes based on the information gains returned from each dataset's attribute  */
+  protected def findBestSplit(data: DataFrame, classes: List[String]): Unit = {
+
+    //    Determine the dataset’s overall entropy: This gives the impurity in the data a baseline measurement.
+    // classMap contains entries like [className, classEntropy]
+    val (overallEntropy, classMap): (Double, Map[String, Double]) = this.calcEntropy(data, classes)
+
+    //    Determine the entropy of each division for each attribute: Calculate the entropy of each partition that results
+        //    from splitting the dataset according to the attribute’s potential values.
+
+
+    //      Calculate the information gain for each attribute: Take the average entropy of each attribute’s divisions
+        //      and deduct it from the dataset’s starting entropy.
+        //      This figure shows how much less entropy was produced by dividing the data according to that characteristic.
+    
+
+    //      Select the feature that yields the most information gain: The decision tree’s current node has chosen
+        //      to split this property since it is thought to be the most informative.
+
+
+    //      For every resultant partition, repeat the following steps: Apply the same procedure recursively to the partitions
+        //      that the split produced, choosing the most informative feature
+        //      for each division and building the decision tree top-down.
+
+  }
+
   /** Build the decision tree */
   def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
     if (allSameClass(data)) {
