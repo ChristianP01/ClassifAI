@@ -2,7 +2,7 @@ package data
 
 import breeze.optimize.DiffFunction.castOps
 import org.apache.spark.api.java.JavaRDD
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.first
 import org.apache.spark.ml.feature.{HashingTF, IDF, StopWordsRemover, Tokenizer, Word2Vec}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
@@ -136,15 +136,11 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     // Creates DataFrame with a new row for each word in a sentence, then groups it to count them
     var wordsDF: DataFrame = this.df.select(explode(this.df.col("Text")) as "words")
     wordsDF = wordsDF.groupBy("words").count()
-    wordsDF = wordsDF.filter(wordsDF.col("count") > 90)
+    wordsDF = wordsDF.filter(wordsDF.col("count") > 10)
     println(wordsDF.count())
 
-    var i: Int = 0
-    wordsDF.select("words").distinct().collect().foreach( word => {
-      wordsDF = wordsDF.withColumn(word.getString(0), lit(""))
-      println(i)
-      i+=1
-    })
+    // Pivot rows to columns and remove first row
+    wordsDF = wordsDF.groupBy().pivot("words").agg(first("count"))
 
     wordsDF.show()
 
