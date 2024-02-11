@@ -5,7 +5,7 @@ import org.apache.spark.sql.functions.col
 
 trait AlgorithmUtils {
   /** Compute the entropy */
-  protected def calcEntropy(df: DataFrame, classes: List[String]): (Double, Map[String, Double]) = {
+  private def calcEntropy(df: DataFrame, classes: List[String]): (Double, Map[String, Double]) = {
     val totalCount: Long = df.count()
     var classMap: Map[String, Double] = Map.empty
 
@@ -20,7 +20,7 @@ trait AlgorithmUtils {
   }
 
   /** Compute the gain */
-  protected def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
+  private def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
     val totalCount = df.count()
     val impurityBeforeSplit = this.calcEntropy(df, classes)._1
     val weights: List[Double] = subsets.map(_.count() / totalCount)
@@ -33,13 +33,13 @@ trait AlgorithmUtils {
   }
 
   /** Returns the majority classes among dataset */
-  protected def getMajorityClass(data: DataFrame, classes: List[String]): Int = {
+  private def getMajorityClass(data: DataFrame, classes: List[String]): Int = {
     val numClasses: List[Int] = classes.map(c => data.filter(data("Topic/Context") === c).count().toInt)
     numClasses.max
   }
 
   /** Check if all instances in the dataset belong to the same class */
-  protected def allSameClass(data: DataFrame): Boolean = {
+  private def allSameClass(data: DataFrame): Boolean = {
     data.select("Topic/Context").distinct().count() == 1
   }
 
@@ -57,7 +57,7 @@ trait AlgorithmUtils {
     //      Calculate the information gain for each attribute: Take the average entropy of each attribute’s divisions
         //      and deduct it from the dataset’s starting entropy.
         //      This figure shows how much less entropy was produced by dividing the data according to that characteristic.
-    
+
 
     //      Select the feature that yields the most information gain: The decision tree’s current node has chosen
         //      to split this property since it is thought to be the most informative.
@@ -70,7 +70,7 @@ trait AlgorithmUtils {
   }
 
   /** Build the decision tree */
-  def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
+  private def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
     if (allSameClass(data)) {
       LeafNode(data.select("Topic/Context").first().getString(0))
     } else if (attributes.isEmpty) {
@@ -94,7 +94,7 @@ trait AlgorithmUtils {
     }
   }
 
-  protected def log2(num: Double): Double = {
+  private def log2(num: Double): Double = {
     if (num == 0) {
       0
     } else {

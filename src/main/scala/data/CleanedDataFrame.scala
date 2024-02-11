@@ -1,8 +1,16 @@
 package data
 
+import breeze.optimize.DiffFunction.castOps
+import org.apache.spark.api.java.JavaRDD
+import org.apache.spark.sql.functions._
 import org.apache.spark.ml.feature.{HashingTF, IDF, StopWordsRemover, Tokenizer, Word2Vec}
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{not, regexp_replace}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.functions.{explode, lit, not, regexp_replace}
+import org.apache.spark.sql.types.IntegerType
+
+import scala.collection.compat.immutable.ArraySeq
+import scala.collection.immutable.Vector
 
 class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
 
@@ -12,9 +20,10 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     .removePunctuations()
     .tokenize()
     .removeStopWords()
-    .termFrequency()
-    .inverseDocumentFrequency()
-    .word2Vec()
+    .wordOccurs()
+//    .termFrequency()
+//    .inverseDocumentFrequency()
+//    .word2Vec()
 
   /** Get the transformed dataframe */
   def getDataFrame: DataFrame = {
@@ -106,14 +115,49 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
   }
 
   private def inverseDocumentFrequency(): CleanedDataFrame = {
-    val idf = new IDF()
+
+    val idf: IDF = new IDF()
+      .setMinDocFreq(5)
       .setInputCol("TF")
       .setOutputCol("IDF")
 
-    val idfModel = idf.fit(this.df)
+    idf.fit(this.df).transform(this.df)
 
-    this.df = idfModel.transform(this.df)
+    this
+  }
 
+  /**
+   * For each word in each row of the "old" DataFrame, create a new row.
+   * Group them to have their count.
+   * Remove rows containing words with a count < 3 (not-so-informative words).
+   */
+  private def wordOccurs(): CleanedDataFrame = {
+
+    // Creates DataFrame with a new row for each word in a sentence, then groups it to count them
+    var wordsDF: DataFrame = this.df.select(explode(this.df.col("Text")) as "words")
+    wordsDF = wordsDF.groupBy("words").count()
+    wordsDF = wordsDF.filter(wordsDF.col("count") > 90)
+    println(wordsDF.count())
+
+    var i: Int = 0
+    wordsDF.select("words").distinct().collect().foreach( word => {
+      wordsDF = wordsDF.withColumn(word.getString(0), lit(""))
+      println(i)
+      i+=1
+    })
+
+    wordsDF.show()
+
+    this.df = wordsDF
+
+    this
+  }
+
+  /**
+   * Creates a new DataFrame from the actual one, starting with the label column only.
+   * Create a binary representation of each sentence tagging as 1 the words they contain.
+   */
+  private def binarizeSenteces(): CleanedDataFrame = {
     this
   }
 
@@ -128,4 +172,5 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
 
     this
   }
+
 }
