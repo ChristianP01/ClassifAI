@@ -72,7 +72,7 @@ trait AlgorithmUtils {
   /** Build the decision tree */
   private def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
     if (allSameClass(data)) {
-      LeafNode(data.select("Topic/Context").first().getString(0))
+      LeafNode(data.select("Context/Topic").first().getString(0))
     } else if (attributes.isEmpty) {
       LeafNode(classes(getMajorityClass(data, classes)))
     } else {

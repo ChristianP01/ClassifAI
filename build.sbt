@@ -8,5 +8,6 @@ lazy val root = (project in file("."))
   .settings(
     name := "ClassifAI",
     libraryDependencies += sparkCore,
-    libraryDependencies += sparkMLlib
+    libraryDependencies += sparkMLlib,
+    libraryDependencies += stemmer
   )

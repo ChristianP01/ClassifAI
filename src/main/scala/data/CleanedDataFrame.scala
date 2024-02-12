@@ -1,16 +1,10 @@
 package data
 
-import breeze.optimize.DiffFunction.castOps
-import org.apache.spark.api.java.JavaRDD
-import org.apache.spark.sql.functions.first
-import org.apache.spark.ml.feature.{HashingTF, IDF, StopWordsRemover, Tokenizer, Word2Vec}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.{explode, lit, not, regexp_replace}
-import org.apache.spark.sql.types.IntegerType
-
-import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.Vector
+import org.apache.spark.sql.functions.{coalesce, col, explode, lit, not, regexp_replace}
+import org.apache.spark.ml.feature.{StopWordsRemover, Tokenizer}
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.mllib.feature.Stemmer
 
 class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
 
@@ -20,10 +14,8 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     .removePunctuations()
     .tokenize()
     .removeStopWords()
+    .stemming()
     .wordOccurs()
-//    .termFrequency()
-//    .inverseDocumentFrequency()
-//    .word2Vec()
 
   /** Get the transformed dataframe */
   def getDataFrame: DataFrame = {
@@ -104,24 +96,29 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     this
   }
 
-  private def termFrequency(): CleanedDataFrame = {
-    val hashingTF = new HashingTF()
+  private def stemming(): CleanedDataFrame = {
+//    val documentAssembler = new DocumentAssembler()
+//      .setInputCol("Text")
+//      .setOutputCol("Document")
+//      .setCleanupMode("shrink")
+
+//    this.df = documentAssembler.transform(this.df)
+
+    val stemmer = new Stemmer()
       .setInputCol("Text")
-      .setOutputCol("TF")
+      .setOutputCol("Stem")
+      .setLanguage("English")
 
-    this.df = hashingTF.transform(this.df)
+    this.df = stemmer.transform(this.df)
 
-    this
-  }
+//    val finisher = new Finisher()
+//      .setInputCols("Stem")
 
-  private def inverseDocumentFrequency(): CleanedDataFrame = {
-
-    val idf: IDF = new IDF()
-      .setMinDocFreq(5)
-      .setInputCol("TF")
-      .setOutputCol("IDF")
-
-    idf.fit(this.df).transform(this.df)
+//    val pipeline = new Pipeline()
+//      .setStages(Array(documentAssembler))
+//
+//    this.df = pipeline.fit(df).transform(df)
+    df.show()
 
     this
   }
@@ -129,44 +126,23 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
   /**
    * For each word in each row of the "old" DataFrame, create a new row.
    * Group them to have their count.
-   * Remove rows containing words with a count < 3 (not-so-informative words).
    */
   private def wordOccurs(): CleanedDataFrame = {
+    val topics = df.select("Context/Topic").distinct.collect.flatMap(_.toSeq)
 
-    // Creates DataFrame with a new row for each word in a sentence, then groups it to count them
-    var wordsDF: DataFrame = this.df.select(explode(this.df.col("Text")) as "words")
-    wordsDF = wordsDF.groupBy("words").count()
-    wordsDF = wordsDF.filter(wordsDF.col("count") > 10)
-    println(wordsDF.count())
+    val topicWordCount = df
+      .select(this.df.col("Context/Topic"), explode(this.df.col("Text")).as("Word"))
+      .groupBy("Word", "Context/Topic")
+      .count()
 
-    // Pivot rows to columns and remove first row
-    wordsDF = wordsDF.groupBy().pivot("words").agg(first("count"))
+    val pivoted = topicWordCount.groupBy("Word").pivot("Context/Topic").sum("count")
 
-    wordsDF.show()
+    val result = topics.foldLeft(pivoted) { (data, column) =>
+      data.withColumn(column.toString, coalesce(col(column.toString), lit(0)))
+    }
 
-    this.df = wordsDF
-
-    this
-  }
-
-  /**
-   * Creates a new DataFrame from the actual one, starting with the label column only.
-   * Create a binary representation of each sentence tagging as 1 the words they contain.
-   */
-  private def binarizeSenteces(): CleanedDataFrame = {
-    this
-  }
-
-  private def word2Vec(): CleanedDataFrame = {
-    val w2v = new Word2Vec()
-      .setInputCol("Text")
-      .setOutputCol("Word2Vec")
-
-    val w2vModel = w2v.fit(this.df)
-
-    this.df = w2vModel.transform(this.df)
+    result.show()
 
     this
   }
-
 }
