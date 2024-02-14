@@ -23,7 +23,7 @@ trait AlgorithmUtils {
   private def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
     val totalCount = df.count()
     val impurityBeforeSplit = this.calcEntropy(df, classes)._1
-    val weights: List[Double] = subsets.map(_.count() / totalCount)
+    val weights: List[Double] = subsets.map(_.count().toDouble / totalCount.toDouble)
 
     val impurityAfterSplit: Double = weights.zip(subsets).map { obj =>
       obj._1 * this.calcEntropy(obj._2, classes)._1
@@ -70,29 +70,32 @@ trait AlgorithmUtils {
   }
 
   /** Build the decision tree */
-  private def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
-    if (allSameClass(data)) {
-      LeafNode(data.select("Context/Topic").first().getString(0))
-    } else if (attributes.isEmpty) {
-      LeafNode(classes(getMajorityClass(data, classes)))
-    } else {
-      val gains = attributes.map { attr =>
-          val groupedData = data.groupBy(attr).count()
-          val subsetGains = groupedData.collect().map { row =>
-            val attrValue = row.getString(0)
-            val subset = data.filter(col(attr) === attrValue)
-            gain(data, classes, List(subset))
-          }
-        (attr, subsetGains.sum)
-      }
+//  private def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
+//    if (allSameClass(data)) {
+//      LeafNode(data.select("Context/Topic").first().getString(0))
+//    } else if (attributes.isEmpty) {
+//      LeafNode(classes(getMajorityClass(data, classes)))
+//    } else {
+//      val gains = attributes.map { attr =>
+//          val groupedData = data.groupBy(attr).count()
+//          val subsetGains = groupedData.collect().map { row =>
+//            val attrValue = row.getString(0)
+//            val subset = data.filter(col(attr) === attrValue)
+//            gain(data, classes, List(subset))
+//          }
+//        (attr, subsetGains.sum)
+//      }
+//
+//      val bestAttribute = gains.maxBy(_._2)._1
+//      val remainingAttributes = attributes.filterNot(_ == bestAttribute)
+//      val children = data.select(bestAttribute).distinct().collect().map(row =>
+//        buildTree(data.filter(data(bestAttribute) === row.get(0)), remainingAttributes, classes)).toList
+//      DecisionNode(bestAttribute, None, children)
+//    }
+//  }
+    def startAlgorithm(): Unit = {
 
-      val bestAttribute = gains.maxBy(_._2)._1
-      val remainingAttributes = attributes.filterNot(_ == bestAttribute)
-      val children = data.select(bestAttribute).distinct().collect().map(row =>
-        buildTree(data.filter(data(bestAttribute) === row.get(0)), remainingAttributes, classes)).toList
-      DecisionNode(bestAttribute, None, children)
     }
-  }
 
   private def log2(num: Double): Double = {
     if (num == 0) {
