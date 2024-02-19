@@ -1,7 +1,6 @@
-package model
+package algorithm
 
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.col
 
 trait AlgorithmUtils {
   /** Compute the entropy */
@@ -19,7 +18,9 @@ trait AlgorithmUtils {
     ).sum, classMap)
   }
 
-  /** Compute the gain */
+  /** Compute the gain
+   * TODO: da rifare
+   * */
   private def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
     val totalCount = df.count()
     val impurityBeforeSplit = this.calcEntropy(df, classes)._1
@@ -48,7 +49,7 @@ trait AlgorithmUtils {
 
     //    Determine the dataset’s overall entropy: This gives the impurity in the data a baseline measurement.
     // classMap contains entries like [className, classEntropy]
-    val (overallEntropy, classMap): (Double, Map[String, Double]) = this.calcEntropy(data, classes)
+    val (overallEntropy, classEntropyMap): (Double, Map[String, Double]) = this.calcEntropy(data, classes)
 
     //    Determine the entropy of each division for each attribute: Calculate the entropy of each partition that results
         //    from splitting the dataset according to the attribute’s potential values.
@@ -93,9 +94,6 @@ trait AlgorithmUtils {
 //      DecisionNode(bestAttribute, None, children)
 //    }
 //  }
-    def startAlgorithm(): Unit = {
-
-    }
 
   private def log2(num: Double): Double = {
     if (num == 0) {

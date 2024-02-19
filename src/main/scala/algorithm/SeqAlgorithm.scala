@@ -1,5 +1,4 @@
 package algorithm
-import model.AlgorithmUtils
 import org.apache.spark.sql.DataFrame
 
 class SeqAlgorithm(df: DataFrame) extends AlgorithmUtils {

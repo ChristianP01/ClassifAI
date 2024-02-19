@@ -90,4 +90,7 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
   this.df = topics.foldLeft(pivoted) { (data, column) =>
     data.withColumn(column, coalesce(col(column), lit(0)))
   }
+
+  /** Add a column with sum of a word's occurrences */
+  this.df = df.withColumn("Total", df.columns.drop(1).map(df(_)).reduce(_ + _))
 }
