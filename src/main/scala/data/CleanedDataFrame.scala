@@ -7,8 +7,8 @@ import org.apache.spark.sql.functions.{coalesce, col, explode, lit, not, regexp_
 import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, StopWordsRemover}
 import org.apache.spark.ml.stat.Summarizer
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, SparkSession, functions}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession, functions}
 
 class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
   /** Get the transformed dataframe */
@@ -78,6 +78,34 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
     .setStages(Array(documentAssembler, tokenizer, stemmer, finisher, remover))
 
   this.df = pipeline.fit(df).transform(df)
+
+  var wordList: List[String] = List.empty // List of words for columns-schema
+  var sentenceList: List[Seq[String]] = List.empty // List of sentences to fill cells
+
+  for (row <- this.df.select("Text").rdd.collect()) {
+
+    val sentence = row.getSeq[String](0).toList
+    sentenceList :+= sentence
+
+    sentence.foreach( word => {
+      if (!wordList.contains(word)) {
+        wordList :+= word
+      }
+    })
+  }
+
+  var schema = new StructType()
+
+  wordList.foreach(fieldName => {
+    schema = schema.add(fieldName, IntegerType)
+  })
+
+  // Edit since, for each sentence in sentenceList, 1 if word is in else 0
+  val cells: Seq[Row] = Seq(Row.fromSeq(Seq.fill(wordList.length)(0)))
+
+  val newdf: DataFrame = this.spark.createDataFrame(spark.sparkContext.parallelize(cells), schema)
+  newdf.show()
+
 /**
   private val cv = new CountVectorizer()
     .setInputCol("Text")
