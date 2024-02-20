@@ -7,7 +7,7 @@ object Main {
     val spark = SparkSession
       .builder
       .appName("ClassifAI")
-      .master("local[1]")
+      .master("local[*]")
       .getOrCreate()
 
     val filePath = "./src/main/assets/Context.csv"
@@ -19,6 +19,6 @@ object Main {
     // Pre processing
     df = preprocessor.getDataFrame
 
-    df.show()
+   // df.show()
   }
 }

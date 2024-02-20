@@ -3,18 +3,18 @@ package data
 import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.sql.functions.{coalesce, col, explode, lit, not, regexp_replace, row_number}
-import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, StopWordsRemover}
-import org.apache.spark.ml.stat.Summarizer
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession, functions}
+import org.apache.spark.sql.functions.{not, regexp_replace}
+import org.apache.spark.ml.feature.StopWordsRemover
+import org.apache.spark.sql.types.{IntegerType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
   /** Get the transformed dataframe */
   def getDataFrame: DataFrame = {
     df
   }
+
+  println("Starting preprocessing phase 1")
 
   /** Remove rows with not allowed topics */
   private val topics = List(
@@ -38,7 +38,7 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
   private val notAlphDF = df.filter(not(df.col("Text").rlike("[a-zA-Z]")))
   private val accentsDF = df.filter(df.col("Text").rlike("[àáâãäåçèéêëìíîïòóôõöùúûü]"))
 
-  this.df = this.df.except(notAlphDF.unionByName(accentsDF, allowMissingColumns = true))
+  this.df = this.df.except(notAlphDF.unionByName(accentsDF))
 
   /** Remove punctuations and multiple whitespace */
   this.df = df
@@ -79,6 +79,9 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
 
   this.df = pipeline.fit(df).transform(df)
 
+  println("Ended preprocessing phase 1")
+  println("Starting preprocessing phase 2")
+
   var wordList: List[String] = List.empty // List of words for columns-schema
   var sentenceList: List[Seq[String]] = List.empty // List of sentences to fill cells
 
@@ -101,42 +104,22 @@ class CleanedDataFrame(private val spark: SparkSession, private var df: DataFram
   })
 
   // Edit since, for each sentence in sentenceList, 1 if word is in else 0
-  val cells: Seq[Row] = Seq(Row.fromSeq(Seq.fill(wordList.length)(0)))
+  var cells: Array[Row] = Array.empty
+  var tmpSeq: Array[Any] = Array.empty
+
+  sentenceList.foreach(sentence => {
+    tmpSeq = Array.fill(wordList.length)(0)
+
+    sentence.foreach(word => {
+      tmpSeq(wordList.indexOf(word)) = 1
+    })
+    cells = cells :+ Row.fromSeq(tmpSeq)
+  })
+
+  println("Ended preprocessing phase 2")
+  println("Saving new preprocessed dataframe")
 
   val newdf: DataFrame = this.spark.createDataFrame(spark.sparkContext.parallelize(cells), schema)
-  newdf.show()
-
-/**
-  private val cv = new CountVectorizer()
-    .setInputCol("Text")
-    .setOutputCol("features")
-
-  this.df = this.df.withColumn("words", explode(df.col("Text")))
-
-  cv.fit(this.df).transform(df)
-    .groupBy(df.col("words"))
-    .agg(functions.count(df.col("words")).as("count"))
-    .withColumn("id", row_number().over(Window.orderBy("words")) -1).show()
-*/
-
-
-//  println(cv.fit(this.df).transform(this.df).head(10).mkString("Array(", ", ", ")"))
-
-  //spark.conf.set("spark.sql.pivotMaxValues", 50000)
-
-//  // Espandi l'array di parole in righe separate
-//  val dfExploded = df.select(this.df.col("Context/Topic"), explode(this.df.col("Text")).as("Word"))
-//
-//  // Aggiungi una colonna con valore 1
-//  val dfWithOne = dfExploded.withColumn("Value", lit(1))
-//
-//  val dfGrouped = dfWithOne.groupBy("Context/Topic", "Word").sum("Value")
-//
-//  // Trasforma le parole in colonne con pivot
-//  val dfPivot = dfGrouped.groupBy("Context/Topic").pivot("Word").sum("sum(Value)")
-//
-//  // Sostituisci i valori null con 0
-//  this.df = dfPivot.na.fill(0)
 
   /**
   /**
