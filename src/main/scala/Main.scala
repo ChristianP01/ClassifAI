@@ -1,5 +1,5 @@
-import data.CleanedDataFrame
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import data.DataframeCleaner
+import org.apache.spark.sql.SparkSession
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -14,7 +14,7 @@ object Main {
     var df = spark.read.option("header", value = true).csv(filePath)
 
     // Dataframe creation
-    val preprocessor = new CleanedDataFrame(spark, df)
+    val preprocessor = new DataframeCleaner(spark, df)
 
     // Pre processing
     df = preprocessor.getDataFrame

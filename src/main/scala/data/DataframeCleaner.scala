@@ -8,7 +8,7 @@ import org.apache.spark.ml.feature.StopWordsRemover
 import org.apache.spark.sql.types.{IntegerType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
-class CleanedDataFrame(private val spark: SparkSession, private var df: DataFrame) {
+class DataframeCleaner(private val spark: SparkSession, private var df: DataFrame) {
   /** Get the transformed dataframe */
   def getDataFrame: DataFrame = {
     df
