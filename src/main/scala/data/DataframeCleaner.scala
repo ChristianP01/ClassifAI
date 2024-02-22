@@ -2,40 +2,20 @@ package data
 
 import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}
-import org.apache.spark.ml.Pipeline
-import org.apache.spark.sql.functions.{col, explode, monotonically_increasing_id, not, regexp_replace, row_number, when}
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.ml.feature.StopWordsRemover
-import org.apache.spark.sql.types.{IntegerType, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{explode, monotonically_increasing_id, not, regexp_replace, row_number}
 
 class DataframeCleaner(private val spark: SparkSession, private var df: DataFrame) {
-  /** Get the transformed dataframe */
-  def getDataFrame: DataFrame = {
-    this.df
-  }
-
   println("Start preprocessing")
 
   /** Remove rows with not allowed topics */
-  private val topics = List(
-    "Animals",
-    "Compliment",
-    "Education",
-    "Health",
-    "Heavy Emotion",
-    "Joke",
-    "Love",
-    "Politics",
-    "Religion",
-    "Science",
-    "Self"
-  )
-
-  /** Remove rows with wrong topic (parsing fault) */
+  private val topics = TopicIndex.getTopicSeq
   this.df = this.df.filter(this.df.col("Context/Topic").isin(topics: _*))
 
-  // Remove rows with non-English sentences
+  /** Remove rows with non-English sentences */
   private val notAlphDF = this.df.filter(not(this.df.col("Text").rlike("[a-zA-Z]")))
   private val accentsDF = this.df.filter(this.df.col("Text").rlike("[àáâãäåçèéêëìíîïòóôõöùúûü]"))
 
@@ -78,11 +58,6 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   this.df = pipeline.fit(df).transform(df)
 
   println("End preprocessing")
-  println("Start pivoting")
-
-  private val maxPivots = 30000
-  /** Increase max pivot in a dataframe to maxPivots */
-  spark.conf.set("spark.sql.pivotMaxValues", maxPivots)
 
   /** Add an index column for every sentence */
   this.df = df.withColumn("Index", row_number().over(Window.orderBy(monotonically_increasing_id())))
@@ -95,27 +70,61 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   /** Remove sparse words with count less than N */
   private var wordCounts = this.df.groupBy("Word").count()
-  private val N = 2
+  private val N = 3
   wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
   this.df = this.df.join(wordCounts, "Word")
 
-  /** Pivot the word column and make a count of words occurrences for every sentences */
-  this.df = this.df
-    .groupBy("Index", "Context/Topic")
-    .pivot("Word")
-    .count()
-    .drop("Index") //Remove Index column
-    .na.fill(0) //Fill NULL values with 0
+  /** Get the transformed dataframe */
+  def getPivotedDataFrame: DataFrame = {
+    println("Start pivoting")
 
-  println("End pivoting")
-  println("Start saving")
+    val maxPivots = 30000
+    /** Increase max pivot in a dataframe to maxPivots */
+    spark.conf.set("spark.sql.pivotMaxValues", maxPivots)
 
-  this.df
-    .write
-    .option("header",value = true)
-    .format("csv")
-    .mode("overwrite")
-    .save(System.getProperty("user.dir") + "/output/")
+    /** Pivot the word column and make a count of words occurrences for every sentences */
+    val pivotedDf = this.df
+      .groupBy("Index", "Context/Topic")
+      .pivot("Word")
+      .count()
+      .drop("Index") //Remove Index column
+      .na.fill(0) //Fill NULL values with 0
 
-  println("End saving")
+    println("End pivoting")
+
+    /**
+     println("Start saving")
+
+     pivotedDf
+     .write
+     .option("header",value = true)
+     .format("csv")
+     .mode("overwrite")
+     .save(System.getProperty("user.dir") + "/output/")
+
+     println("End saving")
+     */
+
+    pivotedDf
+  }
+
+  /** Get the words occurrences map */
+  def getOccurrenceMap: Map[String, Seq[Int]] = {
+    println("Start creating occurrence map")
+
+    val wordCounts = this.df.groupBy("Context/Topic", "Word").count()
+    var wordMap = Map[String, List[Int]]()
+
+    wordCounts.collect().foreach { row =>
+      val topic: String = row.getString(0)
+      val word: String = row.getString(1)
+      val count: Long = row.getLong(2)
+      val counts = wordMap.getOrElse(word, List.fill(TopicIndex.topicsNumber)(0))
+      wordMap += (word -> counts.updated(TopicIndex.getIndex(topic), count.toInt))
+    }
+
+    println("End creating occurrence map")
+
+    wordMap
+  }
 }

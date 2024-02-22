@@ -1,6 +1,7 @@
 package algorithm
 
 import org.apache.spark.sql.DataFrame
+import model.{Node, LeafNode, DecisionNode}
 
 trait AlgorithmUtils {
   /** Compute the entropy */
@@ -9,7 +10,7 @@ trait AlgorithmUtils {
     var classMap: Map[String, Double] = Map.empty
 
     classes.foreach( c =>
-      classMap += c -> df.filter(df("Topic/Context") === c).count().toDouble
+      classMap += c -> df.filter(df("Context/Topic") === c).count().toDouble
     )
 
     // Return the total entropy and a map structured as [classType, classEntropy]
@@ -18,8 +19,31 @@ trait AlgorithmUtils {
     ).sum, classMap)
   }
 
+  private def entropyFormula(x: Double, total: Integer): Double = {
+    -((x/total) * this.log2(x/total))
+  }
+
+  /** Calculate single attribute's entropy
+   *
+   * @param occurMap Map structured as [word, list of sentences of a category containing the word]
+   * @param attr Word-as-column we're analyzing
+   * @param bindingMap Categories binding map
+   * @param category Tree's category
+   * */
+  private def calcEntropy(occurMap: Map[String, List[Integer]], attr: String,
+                          bindingMap: Map[String, Integer], category: String): Double = {
+
+    // Occurrences of attr (word) in all dataset
+    val occurs: List[Integer] = occurMap(attr)
+
+    // Occurrences of attr (word) of a specific category
+    val catOccurs: Integer = occurs(bindingMap(category))
+
+    this.entropyFormula(catOccurs.toDouble, occurs.length) +
+    this.entropyFormula(occurs.length-catOccurs, occurs.length)
+  }
+
   /** Compute the gain
-   * TODO: da rifare
    * */
   private def gain(df: DataFrame, classes: List[String], subsets: List[DataFrame]): Double = {
     val totalCount = df.count()
@@ -35,13 +59,13 @@ trait AlgorithmUtils {
 
   /** Returns the majority classes among dataset */
   private def getMajorityClass(data: DataFrame, classes: List[String]): Int = {
-    val numClasses: List[Int] = classes.map(c => data.filter(data("Topic/Context") === c).count().toInt)
+    val numClasses: List[Int] = classes.map(c => data.filter(data("Context/Topic") === c).count().toInt)
     numClasses.max
   }
 
   /** Check if all instances in the dataset belong to the same class */
   private def allSameClass(data: DataFrame): Boolean = {
-    data.select("Topic/Context").distinct().count() == 1
+    data.select("Context/Topic").distinct().count() == 1
   }
 
   /** Split nodes based on the information gains returned from each dataset's attribute  */
@@ -71,29 +95,56 @@ trait AlgorithmUtils {
   }
 
   /** Build the decision tree */
-//  private def buildTree(data: DataFrame, attributes: List[String], classes: List[String]): Node = {
-//    if (allSameClass(data)) {
-//      LeafNode(data.select("Context/Topic").first().getString(0))
-//    } else if (attributes.isEmpty) {
-//      LeafNode(classes(getMajorityClass(data, classes)))
-//    } else {
-//      val gains = attributes.map { attr =>
-//          val groupedData = data.groupBy(attr).count()
-//          val subsetGains = groupedData.collect().map { row =>
-//            val attrValue = row.getString(0)
-//            val subset = data.filter(col(attr) === attrValue)
-//            gain(data, classes, List(subset))
-//          }
-//        (attr, subsetGains.sum)
-//      }
-//
-//      val bestAttribute = gains.maxBy(_._2)._1
-//      val remainingAttributes = attributes.filterNot(_ == bestAttribute)
-//      val children = data.select(bestAttribute).distinct().collect().map(row =>
-//        buildTree(data.filter(data(bestAttribute) === row.get(0)), remainingAttributes, classes)).toList
-//      DecisionNode(bestAttribute, None, children)
-//    }
-//  }
+  private def buildTree(df: DataFrame, occurMap: Map[String, List[Integer]], attributes: List[String],
+                        bindingMap: Map[String, Integer], category: String): Node = {
+
+    // return failure
+//    if (df.count() == 0)
+
+
+    // return Tree as a single node with most frequent class
+     if (attributes.isEmpty)
+       LeafNode("")
+
+    // return tree as a single node
+    if (attributes.length == 1)
+      LeafNode("") // TODO: what label?
+
+    val tree: DecisionNode = DecisionNode("", List())
+    var gainRatios: Map[Double, String] = Map.empty
+
+    attributes.foreach(attr => {
+      var infogainA: Double = 0.0
+      var splitInfoA: Double = 0.0
+
+      val entropyA: Double = this.calcEntropy(occurMap, attr, bindingMap, category)
+
+      List[Integer](0, 1).foreach(i => {
+        val valuesA = df.where(df.col(attr) === i)
+
+        val dfRatio: Double = valuesA.count() / df.count()
+
+        infogainA += dfRatio * (
+            this.entropyFormula(valuesA.count().toDouble, df.count().toInt) +
+            this.entropyFormula((df.count() - valuesA.count()).toDouble, df.count().toInt)
+          )
+
+        splitInfoA += this.entropyFormula(dfRatio, df.count().toInt)
+      })
+
+      gainRatios += ((entropyA - infogainA) / splitInfoA) -> attr
+    })
+
+    // Return attribute having argmax(gainRatio)
+    val aBest: String = gainRatios(gainRatios.keySet.max)
+    tree.addNode(DecisionNode(aBest, List()))
+
+    List[Integer](0, 1).foreach(i => {
+      this.buildTree(df.where(df.col(aBest) === i), occurMap, attributes, bindingMap, category)
+    })
+
+    tree
+  }
 
   private def log2(num: Double): Double = {
     if (num == 0) {

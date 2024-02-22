@@ -17,8 +17,8 @@ object Main {
     val preprocessor = new DataframeCleaner(spark, df)
 
     // Pre processing
-    df = preprocessor.getDataFrame
+    df = preprocessor.getPivotedDataFrame
 
-   // df.show()
+    preprocessor.getOccurrenceMap
   }
 }
