@@ -1,7 +1,8 @@
 package algorithm
 
+import data.TopicIndex
 import org.apache.spark.sql.DataFrame
-import model.{Node, LeafNode, DecisionNode}
+import model.{DecisionNode, LeafNode, Node}
 
 trait AlgorithmUtils {
   /** Compute the entropy */
@@ -25,19 +26,17 @@ trait AlgorithmUtils {
 
   /** Calculate single attribute's entropy
    *
-   * @param occurMap Map structured as [word, list of sentences of a category containing the word]
+   * @param occurMap Map structured as [word, list of occurrence in every category]
    * @param attr Word-as-column we're analyzing
-   * @param bindingMap Categories binding map
    * @param category Tree's category
    * */
-  private def calcEntropy(occurMap: Map[String, List[Integer]], attr: String,
-                          bindingMap: Map[String, Integer], category: String): Double = {
+  private def calcEntropy(occurMap: Map[String, List[Integer]], attr: String, category: String): Double = {
 
     // Occurrences of attr (word) in all dataset
     val occurs: List[Integer] = occurMap(attr)
 
     // Occurrences of attr (word) of a specific category
-    val catOccurs: Integer = occurs(bindingMap(category))
+    val catOccurs: Integer = occurs(TopicIndex.getIndex(category))
 
     this.entropyFormula(catOccurs.toDouble, occurs.length) +
     this.entropyFormula(occurs.length-catOccurs, occurs.length)
@@ -96,7 +95,7 @@ trait AlgorithmUtils {
 
   /** Build the decision tree */
   private def buildTree(df: DataFrame, occurMap: Map[String, List[Integer]], attributes: List[String],
-                        bindingMap: Map[String, Integer], category: String): Node = {
+                        category: String): Node = {
 
     // return failure
 //    if (df.count() == 0)
@@ -114,17 +113,17 @@ trait AlgorithmUtils {
     var gainRatios: Map[Double, String] = Map.empty
 
     attributes.foreach(attr => {
-      var infogainA: Double = 0.0
+      var infoGainA: Double = 0.0
       var splitInfoA: Double = 0.0
 
-      val entropyA: Double = this.calcEntropy(occurMap, attr, bindingMap, category)
+      val entropyA: Double = this.calcEntropy(occurMap, attr, category)
 
       List[Integer](0, 1).foreach(i => {
         val valuesA = df.where(df.col(attr) === i)
 
         val dfRatio: Double = valuesA.count() / df.count()
 
-        infogainA += dfRatio * (
+        infoGainA += dfRatio * (
             this.entropyFormula(valuesA.count().toDouble, df.count().toInt) +
             this.entropyFormula((df.count() - valuesA.count()).toDouble, df.count().toInt)
           )
@@ -132,7 +131,7 @@ trait AlgorithmUtils {
         splitInfoA += this.entropyFormula(dfRatio, df.count().toInt)
       })
 
-      gainRatios += ((entropyA - infogainA) / splitInfoA) -> attr
+      gainRatios += ((entropyA - infoGainA) / splitInfoA) -> attr
     })
 
     // Return attribute having argmax(gainRatio)
@@ -140,7 +139,7 @@ trait AlgorithmUtils {
     tree.addNode(DecisionNode(aBest, List()))
 
     List[Integer](0, 1).foreach(i => {
-      this.buildTree(df.where(df.col(aBest) === i), occurMap, attributes, bindingMap, category)
+      this.buildTree(df.where(df.col(aBest) === i), occurMap, attributes, category)
     })
 
     tree
