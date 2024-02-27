@@ -8,8 +8,11 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{explode, monotonically_increasing_id, not, regexp_replace, row_number}
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 class DataframeCleaner(private val spark: SparkSession, private var df: DataFrame) {
-  println("Start preprocessing")
+  println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start preprocessing...")
 
   /** Remove rows with not allowed topics */
   private val topics = TopicIndex.getTopicSeq
@@ -57,7 +60,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   this.df = pipeline.fit(df).transform(df)
 
-  println("End preprocessing")
+  println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
 
   /** Add an index column for every sentence */
   this.df = df.withColumn("Index", row_number().over(Window.orderBy(monotonically_increasing_id())))
@@ -70,13 +73,13 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   /** Remove sparse words with count less than N */
   private var wordCounts = this.df.groupBy("Word").count()
-  private val N = 3
+  private val N = 5
   wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
   this.df = this.df.join(wordCounts, "Word")
 
   /** Get the transformed dataframe */
   def getPivotedDataFrame: DataFrame = {
-    println("Start pivoting")
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start pivoting...")
 
     val maxPivots = 30000
     /** Increase max pivot in a dataframe to maxPivots */
@@ -90,27 +93,14 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
       .drop("Index") //Remove Index column
       .na.fill(0) //Fill NULL values with 0
 
-    println("End pivoting")
-
-    /**
-     println("Start saving")
-
-     pivotedDf
-     .write
-     .option("header",value = true)
-     .format("csv")
-     .mode("overwrite")
-     .save(System.getProperty("user.dir") + "/output/")
-
-     println("End saving")
-     */
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End pivoting")
 
     pivotedDf
   }
 
   /** Get the words occurrences map */
   def getOccurrenceMap: Map[String, Seq[Int]] = {
-    println("Start creating occurrence map")
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start creating occurrence map...")
 
     val wordCounts = this.df.groupBy("Context/Topic", "Word").count()
     var wordMap = Map[String, List[Int]]()
@@ -123,8 +113,22 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
       wordMap += (word -> counts.updated(TopicIndex.getIndex(topic), count.toInt))
     }
 
-    println("End creating occurrence map")
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End creating occurrence map")
 
     wordMap
+  }
+
+  /** Save in dataframe in a csv */
+  def saveDataFrame(df: DataFrame): Unit = {
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start saving...")
+
+    df
+      .write
+      .option("header", value = true)
+      .format("csv")
+      .mode("overwrite")
+      .save(System.getProperty("user.dir") + "/output/")
+
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End saving")
   }
 }

@@ -1,5 +1,9 @@
 import data.DataframeCleaner
-import org.apache.spark.sql.SparkSession
+import algorithm.SeqAlgorithm
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -10,15 +14,27 @@ object Main {
       .master("local[*]")
       .getOrCreate()
 
-    val filePath = "./src/main/assets/Context.csv"
-    var df = spark.read.option("header", value = true).csv(filePath)
+    // Upload dataframe
+    val originalDF = spark.read.option("header", value = true).csv(System.getProperty("user.dir") +
+      "/src/main/assets/Context.csv")
 
-    // Dataframe creation
-    val preprocessor = new DataframeCleaner(spark, df)
+    // Preprocess dataframe
+    val preprocessor = new DataframeCleaner(spark, originalDF)
 
-    // Pre processing
-    df = preprocessor.getPivotedDataFrame
+    // Saving preprocessed and pivoted df to apply spark transformation and optimize execution time
+    preprocessor.saveDataFrame(preprocessor.getPivotedDataFrame)
 
-    preprocessor.getOccurrenceMap
+    val occurMap = preprocessor.getOccurrenceMap
+
+    // Read preprocessed dataframe
+    val pivotedDF = spark.read.option("header", value = true).csv(System.getProperty("user.dir") + "/output/")
+
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Starting tree building...")
+
+    val seqAlgorithm = new SeqAlgorithm()
+
+    val tree = seqAlgorithm.buildTree(pivotedDF, occurMap, occurMap.keySet.toList, "Animals")
+
+    println(tree.toString)
   }
 }
