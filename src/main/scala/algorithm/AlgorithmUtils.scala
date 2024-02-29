@@ -3,20 +3,20 @@ package algorithm
 import data.TopicIndex
 import org.apache.spark.sql.DataFrame
 import model.{DecisionNode, LeafNode, Node}
-import org.apache.spark.sql.functions.desc
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 trait AlgorithmUtils {
-  /** Calculate single attribute's entropy
+  /**
+   * Computes single attribute's entropy
    *
    * @param occurMap Map structured as [word, list of occurrences in every category]
    * @param attr Word-as-column we're analyzing
    * @param category Tree's category
+   * @return Entropy of an attribute
    * */
   private def calcEntropy(occurMap: Map[String, Seq[Int]], attr: String, category: String): Double = {
-
     // Occurrences of attr (word) in all dataset
     val occurs: Seq[Int] = occurMap(attr)
     val occursSum = occurs.sum
@@ -25,36 +25,68 @@ trait AlgorithmUtils {
     val catOccurs: Int = occurs(TopicIndex.getIndex(category))
 
     this.entropyFormula(catOccurs.toDouble / occursSum) +
-    this.entropyFormula(occurs.length-catOccurs / occursSum)
+      this.entropyFormula(occurs.length - catOccurs / occursSum) // TODO: occurs.length è il numero di categorie, differenza con occorrenze di categoria?
   }
 
-  private def entropyFormula(x: Double): Double = {
-    -(x * this.log2(x))
+  /**
+   *  Computes entropy
+   *
+   * @param ratio Class probability
+   * @return Entropy
+   */
+  private def entropyFormula(ratio: Double): Double = {
+    - (ratio * this.log2(ratio))
   }
 
-  private def splitAttributes(entropyA: Double, dfCount: Long, attr: String, totalCount: Int): (Double, String) = {
+  /**
+   * Computes attribute's gain ratio
+   *
+   * @param entropyA Attribute's entropy
+   * @param subDFCount DataFrame count after filtered one possible value of attr
+   * @param attr Attribute
+   * @param totalCount DataFrame total count
+   * @return Couple of value (gain ratio, attribute)
+   */
+  private def splitAttribute(entropyA: Double, subDFCount: Int, attr: String, totalCount: Int): (Double, String) = {
     var infoA: Double = 0.0
     var splitInfoA: Double = 0.0
 
-    infoA += (dfCount / totalCount) * (
-      this.entropyFormula(dfCount.toDouble / totalCount) +
-      this.entropyFormula((totalCount - dfCount).toDouble / totalCount)
-    )
+    // Computes info and split for every values of attribute attr (0 or > 0)
+    Seq(subDFCount, totalCount - subDFCount).foreach { subCount =>
+      infoA += (subCount / totalCount) * (
+        this.entropyFormula(subCount.toDouble / totalCount) +
+          this.entropyFormula((totalCount - subCount).toDouble / totalCount)
+        )
 
-    splitInfoA += this.entropyFormula(dfCount.toInt / totalCount)
+      splitInfoA += this.entropyFormula(subCount / totalCount)
+    }
 
+    // Gain ratio
     ((entropyA - infoA) / splitInfoA) -> attr
   }
 
-  /** Build the decision tree */
-  def buildTree(df: DataFrame, occurMap: Map[String, Seq[Int]], attributes: List[String], category: String): Node = {
 
+  /**
+   * Generates the tree
+   *
+   * @param df DataFrame
+   * @param occurMap Map structured as [word, list of occurrences in every category]
+   * @param attributes Sequence of attributes
+   * @param category Label of the tree
+   * @return Node
+   */
+  def buildTree(df: DataFrame, occurMap: Map[String, Seq[Int]], attributes: Seq[String], category: String): Node = {
     val dfCount = df.count().toInt
 
+    if (dfCount == 0) {
+      // TODO: return qualcosa, failure?
+      return null
+    }
+
     // return Tree as a single node with most frequent class
-     if (attributes.isEmpty || dfCount == 0) {
-       return LeafNode(this.getMajorityClass(df, dfCount, category))
-     }
+    if (attributes.isEmpty) {
+      return LeafNode(this.getMajorityClass(df, dfCount, category))
+    }
 
     // return tree as a single node
     if (attributes.length == 1) {
@@ -73,8 +105,7 @@ trait AlgorithmUtils {
 
       val subDFCount = df.where(df.col(attr) === 0).count().toInt
 
-      gainRatios += this.splitAttributes(entropyA, subDFCount, attr, dfCount)
-      gainRatios += this.splitAttributes(entropyA, dfCount-subDFCount, attr, dfCount)
+      gainRatios += this.splitAttribute(entropyA, subDFCount, attr, dfCount)
     })
 
     // Return attribute having argmax(gainRatio)
@@ -97,22 +128,12 @@ trait AlgorithmUtils {
 
   /** Returns the majority classes among dataset */
   private def getMajorityClass(df: DataFrame, dfCount: Int, category: String): String = {
-
     val countCategory = df.filter(df.col("Context/Topic") === category).count().toInt
 
-
-    if (countCategory > (dfCount-countCategory)) {
-      category
-    } else {
-      "Other"
-    }
+    if (countCategory > (dfCount - countCategory)) category else "Other"
   }
 
   private def log2(num: Double): Double = {
-    if (num == 0) {
-      0
-    } else {
-      math.log(num)/math.log(2)
-    }
+    if (num == 0) 0 else math.log(num) / math.log(2)
   }
 }

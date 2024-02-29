@@ -33,7 +33,7 @@ object Main {
 
     val seqAlgorithm = new SeqAlgorithm()
 
-    val tree = seqAlgorithm.buildTree(pivotedDF, occurMap, occurMap.keySet.toList, "Animals")
+    val tree = seqAlgorithm.buildTree(pivotedDF, occurMap, occurMap.keySet.toSeq, "Animals")
 
     println(tree.toString)
   }

@@ -103,13 +103,13 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start creating occurrence map...")
 
     val wordCounts = this.df.groupBy("Context/Topic", "Word").count()
-    var wordMap = Map[String, List[Int]]()
+    var wordMap = Map[String, Seq[Int]]()
 
     wordCounts.collect().foreach { row =>
       val topic: String = row.getString(0)
       val word: String = row.getString(1)
       val count: Long = row.getLong(2)
-      val counts = wordMap.getOrElse(word, List.fill(TopicIndex.topicsNumber)(0))
+      val counts = wordMap.getOrElse(word, Seq.fill(TopicIndex.topicsNumber)(0))
       wordMap += (word -> counts.updated(TopicIndex.getIndex(topic), count.toInt))
     }
 
