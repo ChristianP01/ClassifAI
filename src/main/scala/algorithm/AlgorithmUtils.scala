@@ -1,8 +1,8 @@
 package algorithm
 
-import data.TopicIndex
 import org.apache.spark.sql.DataFrame
 import model.{DecisionNode, LeafNode, Node}
+
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -16,16 +16,17 @@ trait AlgorithmUtils {
    * @param category Tree's category
    * @return Entropy of an attribute
    * */
-  private def calcEntropy(occurMap: Map[String, Seq[Int]], attr: String, category: String): Double = {
+  private def calcEntropy(df: DataFrame, occurMap: Map[String, Seq[Int]], attr: String, category: String): Double = {
     // Occurrences of attr (word) in all dataset
     val occurs: Seq[Int] = occurMap(attr)
     val occursSum = occurs.sum
 
     // Occurrences of attr (word) of a specific category
-    val catOccurs: Int = occurs(TopicIndex.getIndex(category))
+    val catOccurs: Int = occurs.head
 
     this.entropyFormula(catOccurs.toDouble / occursSum) +
-      this.entropyFormula(occurs.length - catOccurs / occursSum) // TODO: occurs.length è il numero di categorie, differenza con occorrenze di categoria?
+      this.entropyFormula(occurs.length - catOccurs / occursSum)
+    // TODO: occurs.length è il numero di categorie, differenza con occorrenze di categoria?
   }
 
   /**
@@ -45,9 +46,9 @@ trait AlgorithmUtils {
    * @param subDFCount DataFrame count after filtered one possible value of attr
    * @param attr Attribute
    * @param totalCount DataFrame total count
-   * @return Couple of value (gain ratio, attribute)
+   * @return Gain ratio of attribute attr
    */
-  private def splitAttribute(entropyA: Double, subDFCount: Int, attr: String, totalCount: Int): (Double, String) = {
+  private def splitAttribute(entropyA: Double, subDFCount: Int, attr: String, totalCount: Int): Double = {
     var infoA: Double = 0.0
     var splitInfoA: Double = 0.0
 
@@ -62,9 +63,8 @@ trait AlgorithmUtils {
     }
 
     // Gain ratio
-    ((entropyA - infoA) / splitInfoA) -> attr
+    (entropyA - infoA) / splitInfoA
   }
-
 
   /**
    * Generates the tree
@@ -85,7 +85,7 @@ trait AlgorithmUtils {
 
     // return Tree as a single node with most frequent class
     if (attributes.isEmpty) {
-      return LeafNode(this.getMajorityClass(df, dfCount, category))
+      return LeafNode(this.getMajorityClass(occurMap, category))
     }
 
     // return tree as a single node
@@ -93,23 +93,20 @@ trait AlgorithmUtils {
       return LeafNode(attributes.head) // TODO: non deve tornare l'attributo ma una classe
     }
 
-    var gainRatios: Map[Double, String] = Map.empty
-
     /**
     occurMap.foreach(pair => {println(pair._1, pair._2)})
     println(dfCount)
     */
 
+    val maxGainRatio = 0.0
+    var aBest: String = ""
+
     attributes.foreach(attr => {
       val entropyA: Double = this.calcEntropy(occurMap, attr, category)
 
-      val subDFCount = df.where(df.col(attr) === 0).count().toInt
-
-      gainRatios += this.splitAttribute(entropyA, subDFCount, attr, dfCount)
+      if (this.splitAttribute(entropyA, occurMap(attr).sum, attr, dfCount ) > maxGainRatio)
+        aBest = attr
     })
-
-    // Return attribute having argmax(gainRatio)
-    val aBest: String = gainRatios(gainRatios.keySet.max)
 
     val actualNode: DecisionNode = DecisionNode(aBest, List())
 
@@ -117,6 +114,8 @@ trait AlgorithmUtils {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Attributes: " + attributes.length)
     println(aBest)
 */
+
+//    occurMap = word -> [20, 200]
 
     actualNode.addNode(this.buildTree(df.where(df.col(aBest) === 0).drop(aBest), occurMap.filterKeys(_ != aBest),
       attributes.filter(_ != aBest), category))
@@ -127,10 +126,15 @@ trait AlgorithmUtils {
   }
 
   /** Returns the majority classes among dataset */
-  private def getMajorityClass(df: DataFrame, dfCount: Int, category: String): String = {
-    val countCategory = df.filter(df.col("Context/Topic") === category).count().toInt
+  private def getMajorityClass(occurMap: Map[String, Seq[Int]], category: String): String = {
 
-    if (countCategory > (dfCount - countCategory)) category else "Other"
+    var countCategories: Seq[Int] = Seq(0,0)
+
+    occurMap.foreach( elem => {
+      countCategories = (countCategories, elem._2).zipped.map(_ + _)
+    })
+
+    if (countCategories.head > countCategories(1)) category else "Other"
   }
 
   private def log2(num: Double): Double = {

@@ -60,13 +60,13 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   this.df = pipeline.fit(df).transform(df)
 
-  println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
-
   /** Add an index column for every sentence */
   this.df = df.withColumn("Index", row_number().over(Window.orderBy(monotonically_increasing_id())))
 
   /** Split a single sentence in multiple rows */
-  this.df = this.df.select(this.df.col("Index"), this.df.col("Context/Topic"), explode(this.df.col("Text")).as("Word"))
+  this.df = this.df
+    .select(this.df.col("Index"), this.df.col("Context/Topic"), explode(this.df.col("Text")).as("Word"))
+    .dropDuplicates("Index", "Word") // Get one occurrence even if a word appears more than one time in a sentence
 
   /** Remove blank characters */
   this.df = this.df.filter(!this.df.col("Word").rlike("^\\s*$"))
@@ -76,6 +76,8 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   private val N = 2500
   wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
   this.df = this.df.join(wordCounts, "Word")
+
+  println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
 
   /** Get the transformed dataframe */
   def getPivotedDataFrame: DataFrame = {

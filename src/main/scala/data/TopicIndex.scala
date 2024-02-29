@@ -1,7 +1,10 @@
 package data
 
-/** Object to get the topic index for the word occurrence map */
+/**
+ * Object to get the topic index for the word occurrence map
+ * */
 object TopicIndex {
+  /** Category index map */
   private val topicMap = Map[String, Int] (
     "Animals" -> 0,
     "Compliment" -> 1,
@@ -19,9 +22,19 @@ object TopicIndex {
   /** Number of topics */
   val topicsNumber: Int = topicMap.size
 
-  /** Returns a sequence of String with all topic names */
+
+  /**
+   * Get all existent category
+   *
+   * @return Sequence of categories names
+   */
   def getTopicSeq: Seq[String] = topicMap.keySet.toSeq
 
-  /** Get a topic index */
+  /**
+   * Get category index
+   *
+   * @param key Name of category
+   * @return Index of category
+   */
   def getIndex(key: String): Int = topicMap(key)
 }
