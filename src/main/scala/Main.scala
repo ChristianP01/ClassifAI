@@ -24,6 +24,7 @@ object Main {
     /** Saving preprocessed and pivoted df to apply spark transformation and optimize execution time */
     preprocessor.saveDataFrame(preprocessor.getPivotedDataFrame)
 
+    // TODO: rimuovere occurrence map
     /** Generate a map with categories count for each word */
     val occurMap = preprocessor.getOccurrenceMap
 
@@ -38,15 +39,8 @@ object Main {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Starting " + category +
       " tree building...")
 
-    /** Aggregate count of categories different from the one of the tree */
-    val categoryMap = occurMap.mapValues { seq =>
-      val categoryCount = seq(TopicIndex.getIndex(category))
-      val otherSum = seq.sum - categoryCount
-
-      Seq(categoryCount, otherSum)
-    }
-
-    val tree = seqAlgorithm.buildTree(pivotedDF, categoryMap, occurMap.keySet.toSeq, category)
+    // TODO: sostituire la lista di attributi togliendo occurmap
+    val tree = seqAlgorithm.buildTree(pivotedDF, occurMap.keySet.toSeq, category)
 
     println(tree.toString)
   }

@@ -73,7 +73,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   /** Remove sparse words with count less than N */
   private var wordCounts = this.df.groupBy("Word").count()
-  private val N = 2500
+  private val N = 1500
   wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
   this.df = this.df.join(wordCounts, "Word")
 
