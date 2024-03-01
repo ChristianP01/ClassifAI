@@ -100,26 +100,6 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
     pivotedDf
   }
 
-  /** Get the words occurrences map */
-  def getOccurrenceMap: Map[String, Seq[Int]] = {
-    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start creating occurrence map...")
-
-    val wordCounts = this.df.groupBy("Context/Topic", "Word").count()
-    var wordMap = Map[String, Seq[Int]]()
-
-    wordCounts.collect().foreach { row =>
-      val topic: String = row.getString(0)
-      val word: String = row.getString(1)
-      val count: Long = row.getLong(2)
-      val counts = wordMap.getOrElse(word, Seq.fill(TopicIndex.topicsNumber)(0))
-      wordMap += (word -> counts.updated(TopicIndex.getIndex(topic), count.toInt))
-    }
-
-    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End creating occurrence map")
-
-    wordMap
-  }
-
   /** Save in dataframe in a csv */
   def saveDataFrame(df: DataFrame): Unit = {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start saving...")
