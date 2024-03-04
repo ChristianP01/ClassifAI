@@ -1,7 +1,6 @@
-import data.{DataframeCleaner, TopicIndex}
+import data.DataframeCleaner
 import algorithm.SeqAlgorithm
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.sparkproject.dmg.pmml.False
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -49,6 +48,6 @@ object Main {
     // TODO: sostituire la lista di attributi togliendo occurmap
     val tree = seqAlgorithm.buildTree(pivotedDF, pivotedDF.columns.filter(_ != "Context/Topic"), category)
 
-    println(tree.toString)
+    println(tree.toString())
   }
 }

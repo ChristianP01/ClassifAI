@@ -90,7 +90,8 @@ trait AlgorithmUtils {
 
     var maxGainRatio = 0.0
     var aBest: String = ""
-
+    
+    // TODO: Verificare che esistano ancora righe con category
     attributes.foreach(attr => {
       val newDF = df.select("Context/Topic", attr).groupBy("Context/Topic").agg(sum(attr))
 
@@ -99,7 +100,7 @@ trait AlgorithmUtils {
       var categorySum: Double = 0.0
 
       if (!filteredDF.isEmpty) {
-        categorySum = filteredDF.first().getDouble(1)
+       categorySum = filteredDF.first().getDouble(1)
 
         val totalSum: Double = newDF.select(sum("sum(" + attr + ")")).first().getDouble(0)
 

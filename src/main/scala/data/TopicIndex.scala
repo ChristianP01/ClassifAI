@@ -22,7 +22,6 @@ object TopicIndex {
   /** Number of topics */
   val topicsNumber: Int = topicMap.size
 
-
   /**
    * Get all existent category
    *
