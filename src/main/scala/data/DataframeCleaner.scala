@@ -75,6 +75,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   private var wordCounts = this.df.groupBy("Word").count()
   private val N = 1500
   wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
+  // TODO: il join rimuove le frasi che non hanno occorrenze di parole
   this.df = this.df.join(wordCounts, "Word")
 
   println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
@@ -92,7 +93,6 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
       .groupBy("Index", "Context/Topic")
       .pivot("Word")
       .count()
-      .drop("Index") //Remove Index column
       .na.fill(0) //Fill NULL values with 0
 
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End pivoting")

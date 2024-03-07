@@ -1,5 +1,5 @@
 import data.DataframeCleaner
-import algorithm.SeqAlgorithm
+import algorithm.{MapReduceAlgorithm, SeqAlgorithm}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.time.LocalDateTime
@@ -37,6 +37,12 @@ object Main {
     /** Read preprocessed dataframe */
     val pivotedDF = spark.read.option("header", value = true).csv(System.getProperty("user.dir") + "/output/")
 
+    val mapReduceAlgorithm = new MapReduceAlgorithm()
+
+    mapReduceAlgorithm.dataPreparation(pivotedDF)
+
+    /**
+
     val seqAlgorithm = new SeqAlgorithm()
 
     // TODO: implementare un albero per categoria e gestire gli output
@@ -45,9 +51,9 @@ object Main {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Starting " + category +
       " tree building...")
 
-    // TODO: sostituire la lista di attributi togliendo occurmap
     val tree = seqAlgorithm.buildTree(pivotedDF, pivotedDF.columns.filter(_ != "Context/Topic"), category)
 
     println(tree.toString())
+    */
   }
 }
