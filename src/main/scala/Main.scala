@@ -37,9 +37,10 @@ object Main {
     /** Read preprocessed dataframe */
     val pivotedDF = spark.read.option("header", value = true).csv(System.getProperty("user.dir") + "/output/")
 
-    val mapReduceAlgorithm = new MapReduceAlgorithm()
+    val mapReduceAlgorithm = new MapReduceAlgorithm(spark)
 
     mapReduceAlgorithm.dataPreparation(pivotedDF)
+    mapReduceAlgorithm.attributeSelection()
 
     /**
 
