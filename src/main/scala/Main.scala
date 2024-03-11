@@ -1,5 +1,6 @@
 import data.DataframeCleaner
 import algorithm.{MapReduceAlgorithm, SeqAlgorithm}
+import org.apache.spark.sql.functions.{col, when}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.time.LocalDateTime
@@ -39,14 +40,16 @@ object Main {
 
     val mapReduceAlgorithm = new MapReduceAlgorithm(spark)
 
-    mapReduceAlgorithm.dataPreparation(pivotedDF)
-    mapReduceAlgorithm.attributeSelection()
+    // TODO: implementare un albero per categoria e gestire gli output
+    val animalsDF = pivotedDF.withColumn("Context/Topic", when(col("Context/Topic") === "Animals", "Animals").otherwise("Other"))
+
+    mapReduceAlgorithm.dataPreparation(animalsDF)
+    mapReduceAlgorithm.generateTree(animalsDF.count().toInt, animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toInt)
 
     /**
 
     val seqAlgorithm = new SeqAlgorithm()
 
-    // TODO: implementare un albero per categoria e gestire gli output
     val category = "Animals"
 
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Starting " + category +

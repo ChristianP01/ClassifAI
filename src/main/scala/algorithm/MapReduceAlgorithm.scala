@@ -1,7 +1,7 @@
 package algorithm
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class MapReduceAlgorithm (spark: SparkSession) {
   private val sc = spark.sparkContext
@@ -14,7 +14,7 @@ class MapReduceAlgorithm (spark: SparkSession) {
 
   def calcEntropy(catCount: Double, totalCount: Double): Double = {
     this.entropyFormula(catCount / totalCount) +
-      this.entropyFormula(totalCount - catCount / totalCount)
+    this.entropyFormula((totalCount - catCount) / totalCount)
   }
 
   private def log2(num: Double): Double = {
@@ -30,46 +30,68 @@ class MapReduceAlgorithm (spark: SparkSession) {
    * Executed only one time.
    */
   def dataPreparation(df: DataFrame): Unit = {
-    /** Populate attrTable */
+
+    // MAP_ATTRIBUTE: populate attrTable
    attrTable = df.rdd.flatMap { row =>
       row
         .toSeq
         .zipWithIndex
         .slice(2, row.toSeq.length)
-        .filter(_._1 == "1")
+//        .filter(_._1 == "1")
         .map {
           case (_, idx) =>
             (row.schema.fieldNames(idx), (row(0).toString.toInt, row(1).toString)) // attribute name, (row_id, label)
         }
-    }
+   }
 
-    countTable = attrTable.map {
-        case (k, (_, l)) => ((k, l), 1)
-      }
-      .reduceByKey(_ + _)
-      .map {
-        case ((k, l), count) => (k, (l, count)) // attribute name, (label, count)
-      }
+   // REDUCE_ATTRIBUTE: emit countTable
+   countTable = attrTable.map {
+       case (k, (_, l)) => ((k, l), 1)
+     }
+     .reduceByKey(_ + _)
+     .map {
+       case ((k, l), count) => (k, (l, count)) // attribute name, (label, count)
+     }
 
-    println(countTable.collect().mkString("Array(", ", ", ")"))
-  }
+   println(countTable.collect().mkString("Array(", ", ", ")"))
+   }
 
-  def attributeSelection(): Unit = {
+  /**
+   * Recursive methods -> evaluate best attribute and generate link between attributes
+   * @param dfCount total number of rows
+   * @param cntL number of rows with correct category label
+   * */
+  def generateTree(dfCount: Int, cntL: Int): Unit = {
+
+    // REDUCE_POPULATION: emit attribute total count
+    /** attribute, totalCount */
     val totalCounts: RDD[(String, Int)] = this.countTable.map {
       case (k, (_, cnt)) => (k, cnt)
     }
     .reduceByKey(_ + _)
 
-    /** attribute, ((label, countLabel), countAll) */
+    // MAP_COMPUTATION
+    /** attribute, ((label, countLabel), totalCount) */
     val joinedRDD = this.countTable
       .join(totalCounts)
       .map {
         case (k, ((_, cnt), all)) =>
-          val infoA = (cnt / all) * this.calcEntropy(cnt, all)
-          val splitInfoA = this.entropyFormula(cnt/all)
-          (k, (infoA, splitInfoA)) // attribute, (info_attr_l, split_attr_l)
+
+
+          val entropyA = this.calcEntropy(cntL, dfCount)
+
+          /** Gain computation */
+          val entropyA1 = this.calcEntropy(cnt, all)
+          val entropyA0 = this.calcEntropy(cntL - cnt, dfCount - all)
+          val infoA = (entropyA1 * (all / dfCount)) + (entropyA0 * ((dfCount - all) / dfCount))
+          val splitInfoA = this.entropyFormula(all / dfCount) + this.entropyFormula((dfCount - all) / dfCount)
+
+
+          (k, (infoA, splitInfoA)) // attribute, (info(v), splitInfo(v))
       }
-      // .reduceByKey(_)
+//      .reduceByKey(_ + _)
+    //val gainA = entropyA - infoA
+    //val gainRatioA = gainA / splitInfoA
 
     println(joinedRDD.collect().mkString("Array(", ", ", ")"))
   }
