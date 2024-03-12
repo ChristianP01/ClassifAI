@@ -4,7 +4,7 @@ import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}
 import org.apache.spark.ml.feature.StopWordsRemover
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Encoders, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{explode, monotonically_increasing_id, not, regexp_replace, row_number}
 
@@ -71,13 +71,6 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   /** Remove blank characters */
   this.df = this.df.filter(!this.df.col("Word").rlike("^\\s*$"))
 
-  /** Remove sparse words with count less than N */
-  private var wordCounts = this.df.groupBy("Word").count()
-  private val N = 1500
-  wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
-  // TODO: il join rimuove le frasi che non hanno occorrenze di parole
-  this.df = this.df.join(wordCounts, "Word")
-
   println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
 
   /** Get the transformed dataframe */
@@ -85,15 +78,25 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start pivoting...")
 
     val maxPivots = 30000
-    /** Increase max pivot in a dataframe to maxPivots */
+    /** Increase max pivot in a dataframe to maxPivots and use case sensitive columns name */
     spark.conf.set("spark.sql.pivotMaxValues", maxPivots)
+    spark.conf.set("spark.sql.caseSensitive", "true")
 
     /** Pivot the word column and make a count of words occurrences for every sentences */
-    val pivotedDf = this.df
+    var pivotedDf = this.df
       .groupBy("Index", "Context/Topic")
       .pivot("Word")
       .count()
       .na.fill(0) //Fill NULL values with 0
+
+    /** Remove word columns with count less than N */
+    var wordCounts = this.df.groupBy("Word").count()
+    val N = 1500
+    wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
+    val columnsName = List("Index", "Context/Topic") ::: // Base column
+      wordCounts.select("Word").as(Encoders.STRING).collect.toList // Word with more than N occurrence
+    val columns = columnsName.map(name => pivotedDf.col(name))
+    pivotedDf = pivotedDf.select(columns: _*) // Keep just the column selected
 
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End pivoting")
 

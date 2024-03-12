@@ -41,7 +41,8 @@ object Main {
     val mapReduceAlgorithm = new MapReduceAlgorithm(spark)
 
     // TODO: implementare un albero per categoria e gestire gli output
-    val animalsDF = pivotedDF.withColumn("Context/Topic", when(col("Context/Topic") === "Animals", "Animals").otherwise("Other"))
+    val animalsDF = pivotedDF.withColumn("Context/Topic",
+      when(col("Context/Topic") === "Animals", "Animals").otherwise("Other"))
 
     mapReduceAlgorithm.dataPreparation(animalsDF)
     mapReduceAlgorithm.generateTree(animalsDF.count().toInt, animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toInt)
