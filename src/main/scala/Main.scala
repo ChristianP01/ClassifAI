@@ -45,7 +45,8 @@ object Main {
       when(col("Context/Topic") === "Animals", "Animals").otherwise("Other"))
 
     mapReduceAlgorithm.dataPreparation(animalsDF)
-    mapReduceAlgorithm.generateTree(animalsDF.count().toInt, animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toInt)
+    mapReduceAlgorithm.generateTree(animalsDF.count().toDouble,
+      animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toDouble)
 
     /**
 

@@ -1,4 +1,5 @@
 package algorithm
+
 import model.{DecisionNode, LeafNode, Node}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.sum
@@ -6,7 +7,7 @@ import org.apache.spark.sql.functions.sum
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class SeqAlgorithm extends AlgorithmUtils {
+class SeqAlgorithm extends IAlgorithm {
 
   /**
    * Generates the tree
