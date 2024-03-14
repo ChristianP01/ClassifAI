@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 class SeqAlgorithm extends IAlgorithm {
-
+/**
   /**
    * Generates the tree
    *
@@ -76,4 +76,5 @@ class SeqAlgorithm extends IAlgorithm {
 
     actualNode
   }
+*/
 }

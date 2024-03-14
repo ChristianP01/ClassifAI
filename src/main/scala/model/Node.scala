@@ -5,20 +5,26 @@ abstract class Node {
 }
 
 case class LeafNode(label: String) extends Node {
+  def getLabel: String = label
+
   override def toString(prefix: String = ""): String = {
-    label
+    label + "\n"
   }
 }
 
-case class DecisionNode(label: String, var children: Seq[Node]) extends Node {
-  def addNode(node: Node): Unit = {
-    this.children = this.children :+ node
-  }
+case class DecisionNode(attribute: String, var leftChild: Node = null, var rightChild: Node = null) extends Node {
+  def getAttribute: String = attribute
+
+  def getLeft: Node = leftChild
+
+  def getRight: Node = rightChild
 
   // TODO: stampare più leggibile
   override def toString(prefix: String = ""): String = {
-    val self = prefix + label + "\n"
-    val childStrings = children.map(child => child.toString(prefix + "| "))
-    self + childStrings.mkString
+    val self = prefix + attribute + "\n"
+    val left = leftChild.toString(prefix + "| ")
+    val right = rightChild.toString(prefix + "| ")
+
+    self + left + right.mkString
   }
 }

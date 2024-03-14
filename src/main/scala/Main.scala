@@ -38,15 +38,14 @@ object Main {
     /** Read preprocessed dataframe */
     val pivotedDF = spark.read.option("header", value = true).csv(System.getProperty("user.dir") + "/output/")
 
-    val mapReduceAlgorithm = new MapReduceAlgorithm(spark)
+    val mapReduceAlgorithm = new MapReduceAlgorithm()
 
     // TODO: implementare un albero per categoria e gestire gli output
     val animalsDF = pivotedDF.withColumn("Context/Topic",
       when(col("Context/Topic") === "Animals", "Animals").otherwise("Other"))
 
-    mapReduceAlgorithm.dataPreparation(animalsDF)
-    mapReduceAlgorithm.generateTree(animalsDF.count().toDouble,
-      animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toDouble)
+    val tree = mapReduceAlgorithm.generateTree(animalsDF, animalsDF.count().toDouble,
+      animalsDF.filter(animalsDF.col("Context/Topic") === "Animals").count().toDouble, 0, "Animals")
 
     /**
 
