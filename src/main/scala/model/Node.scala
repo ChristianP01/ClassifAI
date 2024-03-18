@@ -8,7 +8,7 @@ case class LeafNode(label: String) extends Node {
   def getLabel: String = label
 
   override def toString(prefix: String = ""): String = {
-    label + "\n"
+    prefix + label + "\n"
   }
 }
 
@@ -19,7 +19,6 @@ case class DecisionNode(attribute: String, var leftChild: Node = null, var right
 
   def getRight: Node = rightChild
 
-  // TODO: stampare più leggibile
   override def toString(prefix: String = ""): String = {
     val self = prefix + attribute + "\n"
     val left = leftChild.toString(prefix + "| ")

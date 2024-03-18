@@ -2,11 +2,11 @@ package algorithm
 
 import model.{DecisionNode, LeafNode, Node}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 class MapReduceAlgorithm {
 
-  private val maxDepth = 10
+  private val maxDepth = 20
 
   /**
    * Recursive methods -> evaluate best attribute and generate link between attributes
@@ -18,18 +18,13 @@ class MapReduceAlgorithm {
    *
    * @return Node - a node class with children
    * */
-  def generateTree(df: DataFrame, dfCount: Double, countCategory: Double,
-                   actualDepth: Int, category: String, parentAttr: String = ""): Node = {
+  def generateTree(df: DataFrame, dfCount: Double, countCategory: Double, actualDepth: Int, category: String): Node = {
 
     /** Entropy of label */
     val entropyGeneral: Double = AlgorithmUtils.calcEntropy(countCategory, dfCount)
 
-    if (actualDepth >= maxDepth) {
-      // Return category with highest count
-      if (countCategory > dfCount / 2)
-        return LeafNode(category)
-      else
-        return LeafNode("Other")
+    if (actualDepth >= maxDepth || entropyGeneral <= 0.2) {
+      return LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
     }
 
     /** (attribute, value), (row_id, label) */
@@ -86,27 +81,22 @@ class MapReduceAlgorithm {
       }
       .reduce((k1, k2) => if (k1._2 > k2._2) k1 else k2)._1 // Take the attribute with higher gain ratio
 
-    println(aBest)
+    val leftRDD = joinRDD.filter(_._1 == (aBest, 1.0))
+    val rightRDD = joinRDD.filter(_._1 == (aBest, 0.0))
 
-    /** Checks if aBest is the same of its parent */
-    if (aBest.equals(parentAttr)) {
-      if (countCategory > dfCount / 2)
-        return LeafNode(category)
-      else
-        return LeafNode("Other")
+    if (leftRDD.isEmpty || rightRDD.isEmpty) {
+      LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
+    } else {
+      val leftCounts = leftRDD.first()._2
+      val rightCounts = rightRDD.first()._2
+
+      val leftChild = this.generateTree(df.where(df.col(aBest) === 1).drop(aBest), dfCount = leftCounts._2,
+        countCategory = leftCounts._2 - leftCounts._1._2, actualDepth + 1, category)
+
+      val rightChild = this.generateTree(df.where(df.col(aBest) === 0).drop(aBest), dfCount = rightCounts._2,
+        countCategory = rightCounts._2 - rightCounts._1._2, actualDepth + 1, category)
+
+      DecisionNode(aBest, leftChild, rightChild)
     }
-
-    /** ((label, count), totalCount) split with aBest */
-    val leftCounts = joinRDD.filter(_._1 == (aBest, 1.0)).first()._2
-    val rightCounts = joinRDD.filter(_._1 == (aBest, 0.0)).first()._2
-
-    val leftChild = this.generateTree(df.where(df.col(aBest) === 1), dfCount = leftCounts._2,
-      countCategory = leftCounts._2 - leftCounts._1._2, actualDepth + 1, category, aBest)
-    val rightChild = this.generateTree(df.where(df.col(aBest) === 0), dfCount = rightCounts._2,
-      countCategory = rightCounts._2 - rightCounts._1._2, actualDepth + 1, category, aBest)
-
-    val node = DecisionNode(aBest, leftChild, rightChild)
-
-    node
   }
 }

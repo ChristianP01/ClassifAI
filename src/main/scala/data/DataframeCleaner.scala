@@ -4,7 +4,7 @@ import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}
 import org.apache.spark.ml.feature.StopWordsRemover
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.sql.{Column, DataFrame, Encoders, SparkSession}
+import org.apache.spark.sql.{DataFrame, Encoders, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{explode, monotonically_increasing_id, not, regexp_replace, row_number}
 
@@ -91,7 +91,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
     /** Remove word columns with count less than N */
     var wordCounts = this.df.groupBy("Word").count()
-    val N = 200
+    val N = 100
     wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
     val columnsName = List("Index", "Context/Topic") ::: // Base column
       wordCounts.select("Word").as(Encoders.STRING).collect.toList // Word with more than N occurrence
@@ -104,7 +104,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   }
 
   /** Save in dataframe in a csv */
-  def saveDataFrame(df: DataFrame): Unit = {
+  def saveDataFrame(df: DataFrame, path: String): Unit = {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start saving...")
 
     df
@@ -112,7 +112,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
       .option("header", value = true)
       .format("csv")
       .mode("overwrite")
-      .save(System.getProperty("user.dir") + "/output/")
+      .save(path)
 
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End saving")
   }
