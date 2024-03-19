@@ -91,7 +91,7 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
     /** Remove word columns with count less than N */
     var wordCounts = this.df.groupBy("Word").count()
-    val N = 100
+    val N = 50
     wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
     val columnsName = List("Index", "Context/Topic") ::: // Base column
       wordCounts.select("Word").as(Encoders.STRING).collect.toList // Word with more than N occurrence

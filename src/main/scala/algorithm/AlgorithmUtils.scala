@@ -22,7 +22,13 @@ object AlgorithmUtils extends Serializable {
       "Other"
   }
 
-  def predict(root: Node, sentence: Seq[String]): String = {
+  /** Predict sentence's label given a tree
+   *
+   * @param root Node - tree root
+   * @param sentence Seq[String] - sequence of sentence's words
+   * @return String - label
+   * */
+  private def predict(root: Node, sentence: Seq[String]): String = {
     var tree: Node = root
 
     while(tree.isInstanceOf[DecisionNode])
@@ -32,5 +38,30 @@ object AlgorithmUtils extends Serializable {
         tree = tree.asInstanceOf[DecisionNode].getRight
 
     tree.asInstanceOf[LeafNode].getLabel
+  }
+
+  /** Evaluate correct label across all trees
+   *
+   * @param trees Map[String, Node] - map of tree for each category
+   * @param sentence Seq[String] - sequence of sentence's words
+   * @param categoryCounts Map[String, Double] - map of count for each category
+   * @return String - definitive label
+   *  */
+  def evaluateSentence(trees: Map[String, Node], sentence: Seq[String], categoryCounts: Map[String, Double]): String = {
+    /** Predictions of all trees */
+    val predictions = trees.values.map(predict(_, sentence)).toSeq
+    /** Predictions different from Other */
+    val nonOtherPredictions = predictions.filter(_ != "Other")
+
+    nonOtherPredictions match {
+      /** Every category predicted Other, takes the one with most entries in DF */
+      case Nil => categoryCounts.maxBy(_._2)._1
+
+      /** Only one category predicted itself */
+      case singleResult :: Nil => singleResult
+
+      /** More than one category predicted itself, takes the one with most entries in DF only between them */
+      case _ => categoryCounts.filter { case (category, _) => nonOtherPredictions.contains(category) }.maxBy(_._2)._1
+    }
   }
 }

@@ -1,10 +1,11 @@
-import data.DataframeCleaner
-import algorithm.{AlgorithmUtils, MapReduceAlgorithm, SeqAlgorithm}
+import data.{DataframeCleaner, TopicIndex}
+import algorithm.{AlgorithmUtils, MapReduceAlgorithm}
 import model.Node
 import org.apache.spark.sql.functions.{col, when}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 
 import java.io._
+import java.nio.file.{Files, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
@@ -50,27 +51,30 @@ object Main {
     /** Read preprocessed dataframe */
     val pivotedDF = spark.read.option("header", value = true).csv(actualPath + "/dfOutput/")
 
-    // TODO: sostituire con TopicIndex.getTopicSeq
-    val categories: Seq[String] = Seq("Animals")
+    val categories: Seq[String] = TopicIndex.getTopicSeq
 
-    /** Map of tree where key is category's name and value is a binary decision tree */
+    /** Map of tree where key is category's name and value is a binary decision tree [category name, tree] */
     val trees: mutable.Map[String, Node] = mutable.Map.empty[String, Node]
 
-    if(areTreesNew) {
+    val dfCount = pivotedDF.count().toDouble
+
+    /** Map each category to its count [category name, count] */
+    val categoryCounts = categories.map { category =>
+      (category, pivotedDF.filter(pivotedDF.col("Context/Topic") === category).count().toDouble)
+    }.toMap
+
+     if(areTreesNew) {
       categories foreach { category =>
         println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) +
           " Start " + category + " tree generation...")
 
         val mapReduceAlgorithm = new MapReduceAlgorithm()
 
-        // TODO: implementare un albero per categoria e gestire gli output
-        val animalsDF = pivotedDF.withColumn("Context/Topic",
+        /** Change dataframe to binary label -> non-category = Other */
+        val categoryDF = pivotedDF.withColumn("Context/Topic",
           when(col("Context/Topic") === category, category).otherwise("Other"))
 
-        println(animalsDF.columns.length - 2)
-
-        val tree = mapReduceAlgorithm.generateTree(animalsDF, animalsDF.count().toDouble,
-          animalsDF.filter(animalsDF.col("Context/Topic") === category).count().toDouble, 0, category)
+        val tree = mapReduceAlgorithm.generateTree(categoryDF, dfCount, categoryCounts(category), 0, category)
 
         /** Add the category tree to the sequence of trees */
         trees(category) = tree
@@ -78,11 +82,10 @@ object Main {
         println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) +
           " End " + category + " tree generation")
 
-        println(tree.toString(""))
-
-        /** Write binary representation of tree to file */
-        val treePath = actualPath + "/trees/" + category + ".bin"
-        val out = new ObjectOutputStream(new FileOutputStream(treePath))
+        /** Write binary representation of the tree to file */
+        val treePath = actualPath + "/trees/"
+        if (!Files.exists(Paths.get(treePath))) Files.createDirectories(Paths.get(treePath))
+        val out = new ObjectOutputStream(new FileOutputStream(treePath + category + ".bin"))
         out.writeObject(tree)
         out.close()
       }
@@ -90,7 +93,7 @@ object Main {
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start loading trees...")
 
       categories foreach { category =>
-        /** Read binary representation of tree from file */
+        /** Read binary representation of the tree from file */
         val treePath = actualPath + "/trees/" + category + ".bin"
         val in = new ObjectInputStream(new FileInputStream(treePath))
         val tree: Node = in.readObject().asInstanceOf[Node]
@@ -101,11 +104,13 @@ object Main {
 
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End loading trees")
     }
-    
-    println(AlgorithmUtils.predict(trees("Animals"), "Dog dog dog dog".toLowerCase.split(" ")))
-    println(AlgorithmUtils.predict(trees("Animals"), "The bear is sleeping".toLowerCase.split(" ")))
-    println(AlgorithmUtils.predict(trees("Animals"), "Scalable cloud computing is great".toLowerCase.split(" ")))
-    println(AlgorithmUtils.predict(trees("Animals"), "My dog is not a cat".toLowerCase.split(" ")))
+
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Dog dog dog dog".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The bear is sleeping".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Scalable cloud computing is great".toLowerCase.split(" "),
+      categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "My dog is not a cat".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "aaaaaaaaaaaa".toLowerCase.split(" "), categoryCounts))
 
     /**
 

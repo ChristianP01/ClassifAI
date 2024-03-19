@@ -1,6 +1,7 @@
 .bsp/sbt.json
 project/*
+dfOutput/
 target/
-output/
+trees/
 /.idea/
 !project/Dependencies.scala
