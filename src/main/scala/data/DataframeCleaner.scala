@@ -1,4 +1,4 @@
-package data
+package main.scala.data
 
 import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}

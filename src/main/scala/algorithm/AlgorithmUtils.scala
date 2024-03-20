@@ -1,5 +1,5 @@
-package algorithm
-import model.{DecisionNode, LeafNode, Node}
+package main.scala.algorithm
+import main.scala.model.{DecisionNode, LeafNode, Node}
 
 object AlgorithmUtils extends Serializable {
   def calcEntropy(catCount: Double, totalCount: Double): Double = {

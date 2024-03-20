@@ -1,4 +1,4 @@
-package model
+package main.scala.model
 
 abstract class Node {
   def toString(prefix: String): String

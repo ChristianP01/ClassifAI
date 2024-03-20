@@ -1,4 +1,4 @@
-package data
+package main.scala.data
 
 /**
  * Object to get the topic index for the word occurrence map

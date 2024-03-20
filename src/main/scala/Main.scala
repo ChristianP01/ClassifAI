@@ -1,8 +1,10 @@
-import data.{DataframeCleaner, TopicIndex}
+package main.scala
+
 import algorithm.{AlgorithmUtils, MapReduceAlgorithm}
+import data.{DataframeCleaner, TopicIndex}
 import model.Node
-import org.apache.spark.sql.functions.{col, when}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, when}
 
 import java.io._
 import java.nio.file.{Files, Paths}
@@ -18,7 +20,7 @@ object Main {
      * true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
      */
-    val isDFNew: Boolean = false
+    val isDFNew: Boolean = true
 
     /**
      * Change areTreesNew to execute or skip tree generations and saving.
@@ -26,7 +28,7 @@ object Main {
      * true -> generates new trees and save them
      * false -> load previous generated trees
      */
-    val areTreesNew: Boolean = false
+    val areTreesNew: Boolean = true
 
     val actualPath = System.getProperty("user.dir")
 

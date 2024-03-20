@@ -1,6 +1,6 @@
-package algorithm
+package main.scala.algorithm
 
-import model.{DecisionNode, LeafNode, Node}
+import main.scala.model.{DecisionNode, LeafNode, Node}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.sum
 

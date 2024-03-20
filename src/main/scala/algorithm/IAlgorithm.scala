@@ -1,4 +1,4 @@
-package algorithm
+package main.scala.algorithm
 
 trait IAlgorithm {
   /**
