@@ -11,7 +11,7 @@ import org.apache.spark.sql.functions.{explode, monotonically_increasing_id, not
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class DataframeCleaner(private val spark: SparkSession, private var df: DataFrame) {
+class DataframeCleaner(private val spark: SparkSession, private var df: DataFrame, private var N: Int) {
   println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start preprocessing...")
 
   /** Remove rows with not allowed topics */
@@ -91,7 +91,6 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
     /** Remove word columns with count less than N */
     var wordCounts = this.df.groupBy("Word").count()
-    val N = 50
     wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
     val columnsName = List("Index", "Context/Topic") ::: // Base column
       wordCounts.select("Word").as(Encoders.STRING).collect.toList // Word with more than N occurrence

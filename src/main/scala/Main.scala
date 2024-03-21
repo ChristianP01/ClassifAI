@@ -11,26 +11,31 @@ import java.nio.file.{Files, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
+import scala.util.Try
 
 object Main {
   def main(args: Array[String]): Unit = {
-    /**
-     * Change isDFNew to execute or skip data frame preprocessing and saving.
-     *
+    /** First positional argument
+     * Set the paths where load and save assets
+     * */
+    val actualPath: String = if (args.length > 0) args(0) else System.getProperty("user.dir")
+
+    /** Second positional argument
+     * Set the minimum occurrences a word must have in the dataset to being used as attribute
+     * */
+    val minWordOccurrences: Int = if (args.length > 1) Try(args(1).toInt).getOrElse(200) else 200
+
+    /** Third positional argument
      * true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
-     */
-    val isDFNew: Boolean = true
+     * */
+    val isDFNew: Boolean = if (args.length > 2) Try(args(2).toBoolean).getOrElse(true) else true
 
-    /**
-     * Change areTreesNew to execute or skip tree generations and saving.
-     *
+    /** Fourth positional argument
      * true -> generates new trees and save them
      * false -> load previous generated trees
-     */
-    val areTreesNew: Boolean = true
-
-    val actualPath = "/tmp"
+     * */
+    val areTreesNew: Boolean = if (args.length > 3) Try(args(3).toBoolean).getOrElse(true) else true
 
     /** Start Spark session */
     val spark = SparkSession
@@ -44,7 +49,7 @@ object Main {
       val originalDF = spark.read.option("header", value = true).csv(actualPath + "/Context.csv")
 
       /** Preprocess dataframe */
-      val preprocessor = new DataframeCleaner(spark, originalDF)
+      val preprocessor = new DataframeCleaner(spark, originalDF, minWordOccurrences)
 
       /** Saving preprocessed and pivoted df to apply spark transformation and optimize execution time */
       preprocessor.saveDataFrame(preprocessor.getPivotedDataFrame, actualPath + "/dfOutput/")
