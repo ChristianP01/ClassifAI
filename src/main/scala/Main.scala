@@ -30,7 +30,7 @@ object Main {
      */
     val areTreesNew: Boolean = true
 
-    val actualPath = System.getProperty("user.dir")
+    val actualPath = "/tmp"
 
     /** Start Spark session */
     val spark = SparkSession
@@ -41,7 +41,7 @@ object Main {
 
     if (isDFNew) {
       /** Upload dataframe */
-      val originalDF = spark.read.option("header", value = true).csv(actualPath + "/src/main/assets/Context.csv")
+      val originalDF = spark.read.option("header", value = true).csv(actualPath + "/Context.csv")
 
       /** Preprocess dataframe */
       val preprocessor = new DataframeCleaner(spark, originalDF)

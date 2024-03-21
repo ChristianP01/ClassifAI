@@ -5,3 +5,4 @@ target/
 trees/
 /.idea/
 !project/Dependencies.scala
+ClassifAI.jar
