@@ -5,37 +5,52 @@ import data.{DataframeCleaner, TopicIndex}
 import model.Node
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, when}
-
 import java.io._
 import java.nio.file.{Files, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import scala.collection.mutable
-import scala.util.Try
 
 object Main {
   def main(args: Array[String]): Unit = {
-    /** First positional argument
-     * Set the paths where load and save assets
+    /**
+     * Arguments passed to jar in a map format, for easy access
      * */
-    val actualPath: String = if (args.length > 0) args(0) else System.getProperty("user.dir")
+    val args_map = mutable.Map.empty[String, String]
 
-    /** Second positional argument
-     * Set the minimum occurrences a word must have in the dataset to being used as attribute
+    /**
+     * Retrieve (key, value) pair for each given argument
      * */
-    val minWordOccurrences: Int = if (args.length > 1) Try(args(1).toInt).getOrElse(200) else 200
+    args.foreach( arg => {
+      val argSplit = arg.split("=", 2)
+      args_map(argSplit(0)) = argSplit(1)
+    })
 
-    /** Third positional argument
+    /**
+     * If user provides a path, data (and consequently computation) will be based on cloud resources,
+     * else it will be local
+     * */
+    val actualPath: String = if (args_map.contains("actualPath")) args_map("actualPath")
+    else System.getProperty("user.dir") + "/src/main/assets"
+
+    /**
+     * Set the minimum occurrences a word must have in the dataset to being used as an attribute
+     * */
+    val minWordOccurrences: Int = if (args_map.contains("minOccurs")) args_map("minOccurs").toInt else 200
+
+    /**
      * true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
+     * Defaults to true
      * */
-    val isDFNew: Boolean = if (args.length > 2) Try(args(2).toBoolean).getOrElse(true) else true
+    val computeDF: Boolean = if (args_map.contains("computeDF")) args_map("computeDF").toBoolean else true
 
-    /** Fourth positional argument
+    /**
      * true -> generates new trees and save them
      * false -> load previous generated trees
+     * Defaults to true
      * */
-    val areTreesNew: Boolean = if (args.length > 3) Try(args(3).toBoolean).getOrElse(true) else true
+    val computeTrees: Boolean = if (args_map.contains("computeTrees")) args_map("computeTrees").toBoolean else true
 
     /** Start Spark session */
     val spark = SparkSession
@@ -44,7 +59,7 @@ object Main {
       .master("local[*]")
       .getOrCreate()
 
-    if (isDFNew) {
+    if (computeDF) {
       /** Upload dataframe */
       val originalDF = spark.read.option("header", value = true).csv(actualPath + "/Context.csv")
 
@@ -70,7 +85,7 @@ object Main {
       (category, pivotedDF.filter(pivotedDF.col("Context/Topic") === category).count().toDouble)
     }.toMap
 
-     if(areTreesNew) {
+     if(computeTrees) {
       categories foreach { category =>
         println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) +
           " Start " + category + " tree generation...")
@@ -112,12 +127,12 @@ object Main {
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End loading trees")
     }
 
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Dog dog dog dog".toLowerCase.split(" "), categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The bear is sleeping".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Human body is a perfect machine.".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The dog is sleeping near the campfire".toLowerCase.split(" "), categoryCounts))
     println(AlgorithmUtils.evaluateSentence(trees.toMap, "Scalable cloud computing is great".toLowerCase.split(" "),
       categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "My dog is not a cat".toLowerCase.split(" "), categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "aaaaaaaaaaaa".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "I really love you so much".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "God bless you!".toLowerCase.split(" "), categoryCounts))
 
     /**
 
