@@ -13,50 +13,45 @@ import scala.collection.mutable
 
 object Main {
   def main(args: Array[String]): Unit = {
-    /**
-     * Arguments passed to jar in a map format, for easy access
-     * */
-    val args_map = mutable.Map.empty[String, String]
+    println("Received arguments: " + args.mkString("Array(", ", ", ")"))
 
     /**
-     * Retrieve (key, value) pair for each given argument
+     * Retrieve (key, value) pair for each given argument and put in a map
      * */
-    args.foreach( arg => {
+    val args_map: Map[String, String] = args.map { arg =>
       val argSplit = arg.split("=", 2)
-      args_map(argSplit(0)) = argSplit(1)
-    })
+      (argSplit(0), argSplit(1))
+    }.toMap
 
     /**
      * If user provides a path, data (and consequently computation) will be based on cloud resources,
      * else it will be local
      * */
-    val actualPath: String = if (args_map.contains("actualPath")) args_map("actualPath")
-    else System.getProperty("user.dir") + "/src/main/assets"
+    val actualPath: String = args_map.getOrElse("actualPath", System.getProperty("user.dir") + "/src/main/assets")
 
     /**
      * Set the minimum occurrences a word must have in the dataset to being used as an attribute
      * */
-    val minWordOccurrences: Int = if (args_map.contains("minOccurs")) args_map("minOccurs").toInt else 200
+    val minWordOccurrences: Int = args_map.getOrElse("minOccurs", 200).toString.toInt
 
     /**
      * true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
      * Defaults to true
      * */
-    val computeDF: Boolean = if (args_map.contains("computeDF")) args_map("computeDF").toBoolean else true
+    val computeDF: Boolean = args_map.getOrElse("computeDF", true).toString.toBoolean
 
     /**
      * true -> generates new trees and save them
      * false -> load previous generated trees
      * Defaults to true
      * */
-    val computeTrees: Boolean = if (args_map.contains("computeTrees")) args_map("computeTrees").toBoolean else true
+    val computeTrees: Boolean = args_map.getOrElse("computeTrees", true).toString.toBoolean
 
     /** Start Spark session */
     val spark = SparkSession
       .builder
       .appName("ClassifAI")
-      .master("local[*]")
       .getOrCreate()
 
     if (computeDF) {
@@ -71,7 +66,11 @@ object Main {
     }
 
     /** Read preprocessed dataframe */
-    val pivotedDF = spark.read.option("header", value = true).csv(actualPath + "/dfOutput/")
+    var pivotedDF = spark.read.option("header", value = true).csv(actualPath + "/dfOutput/")
+
+    pivotedDF = pivotedDF.repartition(96).cache()
+
+    println("Number of words: " + (pivotedDF.columns.length - 2))
 
     val categories: Seq[String] = TopicIndex.getTopicSeq
 
@@ -93,8 +92,10 @@ object Main {
         val mapReduceAlgorithm = new MapReduceAlgorithm()
 
         /** Change dataframe to binary label -> non-category = Other */
-        val categoryDF = pivotedDF.withColumn("Context/Topic",
+        var categoryDF = pivotedDF.withColumn("Context/Topic",
           when(col("Context/Topic") === category, category).otherwise("Other"))
+
+        categoryDF = categoryDF.repartition(96).cache()
 
         val tree = mapReduceAlgorithm.generateTree(categoryDF, dfCount, categoryCounts(category), 0, category)
 
@@ -127,11 +128,14 @@ object Main {
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End loading trees")
     }
 
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Human body is a perfect machine.".toLowerCase.split(" "), categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The dog is sleeping near the campfire".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Human body is a perfect machine.".toLowerCase.split(" "),
+      categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The dog is sleeping near the campfire".toLowerCase.split(" "),
+      categoryCounts))
     println(AlgorithmUtils.evaluateSentence(trees.toMap, "Scalable cloud computing is great".toLowerCase.split(" "),
       categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "I really love you so much".toLowerCase.split(" "), categoryCounts))
+    println(AlgorithmUtils.evaluateSentence(trees.toMap, "I really love you so much".toLowerCase.split(" "),
+      categoryCounts))
     println(AlgorithmUtils.evaluateSentence(trees.toMap, "God bless you!".toLowerCase.split(" "), categoryCounts))
 
     /**
