@@ -4,9 +4,7 @@ import main.scala.model.{DecisionNode, LeafNode, Node}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 
-class MapReduceAlgorithm {
-
-  private val maxDepth = 20
+class MapReduceAlgorithm(maxDepth: Int = 20) {
 
   /**
    * Recursive methods -> evaluate best attribute and generate link between attributes

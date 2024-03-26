@@ -1,80 +1,79 @@
 package main.scala.algorithm
 
 import main.scala.model.{DecisionNode, LeafNode, Node}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.sum
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+class SeqAlgorithm(spark: SparkSession, maxDepth: Int = 20) {
 
-class SeqAlgorithm extends IAlgorithm {
-/**
   /**
-   * Generates the tree
+   * Recursive methods -> evaluate best attribute and generate link between attributes
+   * @param df sub data frame
+   * @param dfCount total number of rows
+   * @param countCategory number of rows with correct category label
+   * @param actualDepth tree depth
+   * @param category tree category of interest
    *
-   * @param df DataFrame
-   * @param attributes Sequence of attributes
-   * @param category Label of the tree
-   * @return Node
+   * @return Node - a node class with children
    */
-  def buildTree(df: DataFrame, attributes: Seq[String], category: String): Node = {
-    val dfCount = df.count().toDouble
+  def generateTree(df: DataFrame, dfCount: Double, countCategory: Double, actualDepth: Int, category: String): Node = {
 
-    if (dfCount == 0) {
-      println("dfCount 0")
-      // TODO: return qualcosa, failure?
-      return null
+    /** Entropy of label */
+    val entropyGeneral: Double = AlgorithmUtils.calcEntropy(countCategory, dfCount)
+
+    if (actualDepth >= maxDepth || entropyGeneral <= 0.2) {
+      return LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
     }
 
-    // return Tree as a single node with most frequent class
-    if (attributes.isEmpty) {
-      // TODO: sistemare majority class
-      //return LeafNode(this.getMajorityClass(category))
-    }
+    /** Sequence of attribute */
+    val attributes: Seq[String] = df.drop("Index", "Context/Topic").columns.toSeq
 
-    // return tree as a single node
-    if (attributes.length == 1) {
-      println("attributes == 1")
-      return LeafNode(attributes.head) // TODO: non deve tornare l'attributo ma una classe
-    }
+    var maxGainRatio, leftCount, leftCategoryCount = 0.0
+    var aBest = ""
+    var leftDF = spark.emptyDataFrame
 
-    var maxGainRatio = 0.0
-    var aBest: String = ""
+    attributes foreach { attribute =>
+      /** Data frame with attribute's value 1 */
+      val df1 = df.where(df.col(attribute) === 1)
+      /** Data frame count with attribute's value 1 */
+      val df1Count = df1.count.toDouble
+      /** Data frame category count with attribute's value 1 */
+      val df1CategoryCount = df1.where(df1.col("Context/Topic") === category).count.toDouble
+      /** Data frame count with attribute's value 0 (complementary of 1) */
+      val df0Count = dfCount - df1Count
+      /** Data frame category count with attribute's value 0 (complementary of 1) */
+      val df0CategoryCount = countCategory - df1CategoryCount
 
-    // TODO: Verificare che esistano ancora righe con category
-    attributes.foreach(attr => {
-      val newDF = df.select("Context/Topic", attr).groupBy("Context/Topic").agg(sum(attr))
+      /** Entropy of label in data frame with attribute's value 1 */
+      val entropyA1 = AlgorithmUtils.calcEntropy(df1CategoryCount, df1Count)
+      /** Entropy of label in data frame with attribute's value 0 */
+      val entropyA0 = AlgorithmUtils.calcEntropy(df0CategoryCount, df0Count)
 
-      val filteredDF = newDF.where(newDF.col("Context/Topic") === category)
+      val info = ((df1Count / dfCount) * entropyA1) + ((df0Count / dfCount) * entropyA0)
+      val splitInfo = AlgorithmUtils.entropyFormula(df1Count / dfCount) +
+        AlgorithmUtils.entropyFormula(df0Count / dfCount)
 
-      var categorySum: Double = 0.0
+      /** Gain ratio of attribute */
+      val gainRatio = (entropyGeneral - info) / splitInfo
 
-      if (!filteredDF.isEmpty) {
-        categorySum = filteredDF.first().getDouble(1)
-
-        val totalSum: Double = newDF.select(sum("sum(" + attr + ")")).first().getDouble(0)
-
-        val entropyA: Double = calcEntropy(categorySum, totalSum, attr, category)
-
-        val attrRatio = splitAttribute(entropyA, totalSum, attr, dfCount)
-
-        if (attrRatio > maxGainRatio) {
-          maxGainRatio = attrRatio
-          aBest = attr
-        }
+      if (gainRatio > maxGainRatio) {
+        maxGainRatio = gainRatio
+        aBest = attribute
+        leftDF = df1.drop(aBest)
+        leftCount = df1Count
+        leftCategoryCount = df1CategoryCount
       }
-    })
+    }
 
-    val actualNode: DecisionNode = DecisionNode(aBest, List())
+    val rightDF = df.where(df.col(aBest) === 0).drop(aBest)
 
-    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Attributes: " + attributes.length)
-    println(aBest)
-    println(maxGainRatio)
+    if (leftDF.isEmpty || rightDF.isEmpty)
+      LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
+    else {
+      val leftChild = this.generateTree(leftDF, leftCount, leftCategoryCount, actualDepth + 1, category)
+      val rightChild = this.generateTree(rightDF, dfCount - leftCount, countCategory - leftCategoryCount,
+        actualDepth + 1, category)
 
-    actualNode.addNode(this.buildTree(df.where(df.col(aBest) === 0).drop(aBest), attributes.filter(_ != aBest), category))
-    actualNode.addNode(this.buildTree(df.where(df.col(aBest) > 0).drop(aBest), attributes.filter(_ != aBest), category))
-
-    actualNode
+      DecisionNode(aBest, leftChild, rightChild)
+    }
   }
-*/
 }
