@@ -25,15 +25,15 @@ object Main {
     /** Path to resources */
     val actualPath: String = args_map.getOrElse("actualPath", System.getProperty("user.dir") + "/src/main/assets")
 
-    /** Set the minimum occurrences a word must have in the dataset to being used as an attribute */
-    val minWordOccurrences: Int = args_map.getOrElse("minOccurs", 200).toString.toInt
-
     /**
      * true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
      * Defaults to true
      * */
     val computeDF: Boolean = args_map.getOrElse("computeDF", true).toString.toBoolean
+
+    /** Set the minimum occurrences a word must have in the dataset to being used as an attribute */
+    val minWordOccurrences: Int = args_map.getOrElse("minOccurs", 200).toString.toInt
 
     /**
      * true -> utilizes map-reduce algorithm
@@ -51,6 +51,14 @@ object Main {
 
     /** Set the max depth for the generation of the trees */
     val treeMaxDepth: Int = args_map.getOrElse("treeMaxDepth", 20).toString.toInt
+
+    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Arguments selected:" +
+      "\nactualPath --> " + actualPath +
+      "\ncomputeDF --> " + computeDF.toString +
+      "\nminWordOccurrences --> " + minWordOccurrences +
+      "\nmapReduce --> " + mapReduce.toString +
+      "\ncomputeTrees --> " + computeTrees.toString +
+      "\ntreeMaxDepth --> " + treeMaxDepth)
 
     /** Start Spark session */
     val spark = SparkSession
