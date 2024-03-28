@@ -21,7 +21,7 @@ class MapReduceAlgorithm(maxDepth: Int = 20) {
     /** Entropy of label */
     val entropyGeneral: Double = AlgorithmUtils.calcEntropy(countCategory, dfCount)
 
-    if (actualDepth >= maxDepth || entropyGeneral <= 0.2) {
+    if (actualDepth >= maxDepth || entropyGeneral <= 0.2 || df.columns.length <= 3) {
       return LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
     }
 
@@ -34,7 +34,7 @@ class MapReduceAlgorithm(maxDepth: Int = 20) {
         .map {
           case (value, idx) =>
             // (attribute name, value), (row_id, label)
-            ((row.schema.fieldNames(idx), value.toString.toDouble), (row(0).toString.toDouble, row(1).toString))
+            ((row.schema.fieldNames(idx), value.toString.toDouble), (row(1).toString.toDouble, row(0).toString))
         }
     }
 

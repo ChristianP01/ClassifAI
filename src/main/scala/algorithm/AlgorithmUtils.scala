@@ -1,5 +1,6 @@
 package main.scala.algorithm
 import main.scala.model.{DecisionNode, LeafNode, Node}
+import org.apache.spark.sql.DataFrame
 
 object AlgorithmUtils extends Serializable {
   def calcEntropy(catCount: Double, totalCount: Double): Double = {
@@ -20,6 +21,13 @@ object AlgorithmUtils extends Serializable {
       category
     else
       "Other"
+  }
+
+  /** Split data frame in training and test */
+  def splitDataFrame(df: DataFrame): Map[String, DataFrame] = {
+    val Array(train, test) = df.randomSplit(Array(0.8, 0.2), seed = 160343280324L)
+
+    Map("Training" -> train, "Test" -> test)
   }
 
   /** Predict sentence's label given a tree
@@ -47,7 +55,7 @@ object AlgorithmUtils extends Serializable {
    * @param categoryCounts Map[String, Double] - map of count for each category
    * @return String - definitive label
    *  */
-  def evaluateSentence(trees: Map[String, Node], sentence: Seq[String], categoryCounts: Map[String, Double]): String = {
+  private def evaluateSentence(trees: Map[String, Node], sentence: Seq[String], categoryCounts: Map[String, Double]): String = {
     /** Predictions of all trees */
     val predictions = trees.values.map(predict(_, sentence)).toSeq
     /** Predictions different from Other */
@@ -63,5 +71,17 @@ object AlgorithmUtils extends Serializable {
       /** More than one category predicted itself, takes the one with most entries in DF only between them */
       case _ => categoryCounts.filter { case (category, _) => nonOtherPredictions.contains(category) }.maxBy(_._2)._1
     }
+  }
+
+  def calcMetrics(testDF: DataFrame, trees: Map[String, Node], categoryCounts: Map[String, Double]): Unit = {
+    val map = testDF.rdd.map { row =>
+      if (this.evaluateSentence(trees, row(0).asInstanceOf[Seq[String]], categoryCounts)
+        .equals(row(1).asInstanceOf[String]))
+        ("correct", 1)
+      else
+        ("wrong", 1)
+    }.reduceByKey(_ + _).collectAsMap()
+
+    println("Accuracy: " + map("correct") / (map("correct") + map("wrong")) + "%")
   }
 }

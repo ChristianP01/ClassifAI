@@ -55,7 +55,7 @@ object Main {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Arguments selected:" +
       "\nactualPath --> " + actualPath +
       "\ncomputeDF --> " + computeDF.toString +
-      "\nminWordOccurrences --> " + minWordOccurrences +
+      "\nminOccurs --> " + minWordOccurrences +
       "\nmapReduce --> " + mapReduce.toString +
       "\ncomputeTrees --> " + computeTrees.toString +
       "\ntreeMaxDepth --> " + treeMaxDepth)
@@ -64,6 +64,7 @@ object Main {
     val spark = SparkSession
       .builder
       .appName("ClassifAI")
+      .master("local[*]")
       .getOrCreate()
 
     if (computeDF) {
@@ -73,14 +74,23 @@ object Main {
       /** Preprocess dataframe */
       val preprocessor = new DataframeCleaner(spark, originalDF, minWordOccurrences)
 
-      /** Saving preprocessed and pivoted df to apply spark transformation and optimize execution time */
-      preprocessor.saveDataFrame(preprocessor.getPivotedDataFrame, actualPath + "/dfOutput/")
+      val splitDFs = preprocessor.getDFMap
+
+      val trainDF = preprocessor.getPivotedDataFrame(splitDFs("Training"))
+
+      println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start saving...")
+
+      /** Saving preprocessed data frames to apply spark transformation and optimize execution time */
+      preprocessor.saveDataFrame(trainDF, actualPath + "/dfOutput/Training")
+
+      preprocessor.saveDataFrame(splitDFs("Test"), actualPath + "/dfOutput/Test")
+
+      println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End saving")
     }
 
     /** Read preprocessed dataframe */
-    var pivotedDF = spark.read.option("header", value = true).csv(actualPath + "/dfOutput/")
-
-    pivotedDF = pivotedDF.repartition(96).cache()
+    val pivotedDF = spark.read.option("header", value = true).json(actualPath + "/dfOutput/Training")
+      .repartition(96).cache()
 
     println("Number of words: " + (pivotedDF.columns.length - 2))
 
@@ -102,10 +112,9 @@ object Main {
           " Start " + category + " tree generation...")
 
         /** Change dataframe to binary label -> non-category = Other */
-        var categoryDF = pivotedDF.withColumn("Context/Topic",
+        val categoryDF = pivotedDF.withColumn("Context/Topic",
           when(col("Context/Topic") === category, category).otherwise("Other"))
-
-        categoryDF = categoryDF.repartition(96).cache()
+          .repartition(96).cache()
 
         val tree = if (mapReduce)
           new MapReduceAlgorithm(treeMaxDepth).generateTree(categoryDF, dfCount, categoryCounts(category), 0, category)
@@ -144,14 +153,9 @@ object Main {
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End loading trees")
     }
 
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Human body is a perfect machine.".toLowerCase.split(" "),
-      categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "The dog is sleeping near the campfire".toLowerCase.split(" "),
-      categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "Scalable cloud computing is great".toLowerCase.split(" "),
-      categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "I really love you so much".toLowerCase.split(" "),
-      categoryCounts))
-    println(AlgorithmUtils.evaluateSentence(trees.toMap, "God bless you!".toLowerCase.split(" "), categoryCounts))
+    val testDF = spark.read.option("header", value = true).json(actualPath + "/dfOutput/Test")
+      .repartition(96).cache()
+
+    AlgorithmUtils.calcMetrics(testDF, trees.toMap, categoryCounts)
   }
 }

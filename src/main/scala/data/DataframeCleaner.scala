@@ -2,6 +2,7 @@ package main.scala.data
 
 import com.johnsnowlabs.nlp.{DocumentAssembler, Finisher}
 import com.johnsnowlabs.nlp.annotator.{Stemmer, Tokenizer}
+import main.scala.algorithm.AlgorithmUtils
 import org.apache.spark.ml.feature.StopWordsRemover
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.sql.{DataFrame, Encoders, SparkSession}
@@ -61,20 +62,18 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
   this.df = pipeline.fit(df).transform(df)
 
   /** Add an index column for every sentence */
-  this.df = df.withColumn("Index", row_number().over(Window.orderBy(monotonically_increasing_id())))
-
-  /** Split a single sentence in multiple rows */
-  this.df = this.df
-    .select(this.df.col("Index"), this.df.col("Context/Topic"), explode(this.df.col("Text")).as("Word"))
-    .dropDuplicates("Index", "Word") // Get one occurrence even if a word appears more than one time in a sentence
-
-  /** Remove blank characters */
-  this.df = this.df.filter(!this.df.col("Word").rlike("^\\s*$"))
+  this.df = df
+    .withColumn("Index", row_number().over(Window.orderBy(monotonically_increasing_id())))
+    .drop("NoSymbols", "NoPunct", "Tokens")
 
   println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End preprocessing")
 
+  def getDFMap: Map[String, DataFrame] = {
+    AlgorithmUtils.splitDataFrame(this.df)
+  }
+
   /** Get the transformed dataframe */
-  def getPivotedDataFrame: DataFrame = {
+  def getPivotedDataFrame(trainDF: DataFrame): DataFrame = {
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start pivoting...")
 
     val maxPivots = 30000
@@ -82,15 +81,23 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
     spark.conf.set("spark.sql.pivotMaxValues", maxPivots)
     spark.conf.set("spark.sql.caseSensitive", "true")
 
+    /** Split a single sentence in multiple rows */
+    var newDF = trainDF
+      .select(trainDF.col("Index"), trainDF.col("Context/Topic"), explode(trainDF.col("Text")).as("Word"))
+      .dropDuplicates("Index", "Word") // Get one occurrence even if a word appears more than one time in a sentence
+
+    /** Remove blank characters */
+    newDF = newDF.filter(!newDF.col("Word").rlike("^\\s*$"))
+
     /** Pivot the word column and make a count of words occurrences for every sentences */
-    var pivotedDf = this.df
+    var pivotedDf = newDF
       .groupBy("Index", "Context/Topic")
       .pivot("Word")
       .count()
       .na.fill(0) //Fill NULL values with 0
 
     /** Remove word columns with count less than N */
-    var wordCounts = this.df.groupBy("Word").count()
+    var wordCounts = newDF.groupBy("Word").count()
     wordCounts = wordCounts.filter(wordCounts.col("count") >= N)
     val columnsName = List("Index", "Context/Topic") ::: // Base column
       wordCounts.select("Word").as(Encoders.STRING).collect.toList // Word with more than N occurrence
@@ -104,15 +111,11 @@ class DataframeCleaner(private val spark: SparkSession, private var df: DataFram
 
   /** Save in dataframe in a csv */
   def saveDataFrame(df: DataFrame, path: String): Unit = {
-    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start saving...")
-
     df
       .write
       .option("header", value = true)
-      .format("csv")
+      .format("json")
       .mode("overwrite")
       .save(path)
-
-    println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " End saving")
   }
 }
