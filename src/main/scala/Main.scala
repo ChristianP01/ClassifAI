@@ -129,21 +129,27 @@ object Main {
 
         /** Write binary representation of the tree to file */
         val algorithmSelectionPath = if (mapReduce) "mapReduce/" else "sequential/"
-        val treePath = actualPath + "/trees/" + algorithmSelectionPath + category + ".bin"
-        if (!Files.exists(Paths.get(treePath))) Files.createDirectories(Paths.get(treePath))
-        val out = new ObjectOutputStream(new FileOutputStream(treePath + category + ".bin"))
+        val treeDirPath = actualPath + "/trees/" + algorithmSelectionPath
+        if (!Files.exists(Paths.get(treeDirPath))) Files.createDirectories(Paths.get(treeDirPath))
+        val out = new ObjectOutputStream(new FileOutputStream(treeDirPath + category + ".bin"))
         out.writeObject(tree)
         out.close()
       }
     } else {
       println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Start loading trees...")
 
+      /** Eventual directory creation */
+      val algorithmSelectionPath = if (mapReduce) "mapReduce/" else "sequential/"
+      val generalTreesDirPath = actualPath + "/trees/"
+      val treeDirPath = generalTreesDirPath + algorithmSelectionPath
+
+      if (!Files.exists(Paths.get(generalTreesDirPath))) Files.createDirectories(Paths.get(generalTreesDirPath))
+      if (!Files.exists(Paths.get(treeDirPath))) Files.createDirectories(Paths.get(treeDirPath))
+
       categories foreach { category =>
 
         /** Read binary representation of the tree from file */
-        val algorithmSelectionPath = if (mapReduce) "mapReduce/" else "sequential/"
-        val treePath = actualPath + "/trees/" + algorithmSelectionPath + category + ".bin"
-        val in = new ObjectInputStream(new FileInputStream(treePath))
+        val in = new ObjectInputStream(new FileInputStream(treeDirPath + category + ".bin"))
         val tree: Node = in.readObject().asInstanceOf[Node]
         in.close()
 

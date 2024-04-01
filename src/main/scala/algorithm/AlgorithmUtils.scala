@@ -74,14 +74,22 @@ object AlgorithmUtils extends Serializable {
   }
 
   def calcMetrics(testDF: DataFrame, trees: Map[String, Node], categoryCounts: Map[String, Double]): Unit = {
-    val map = testDF.rdd.map { row =>
-      if (this.evaluateSentence(trees, row(0).asInstanceOf[Seq[String]], categoryCounts)
-        .equals(row(1).asInstanceOf[String]))
-        ("correct", 1)
-      else
-        ("wrong", 1)
-    }.reduceByKey(_ + _).collectAsMap()
 
-    println("Accuracy: " + map("correct") / (map("correct") + map("wrong")) + "%")
+    /** Each row with following format:
+     * 0 --> Ground truth
+     * 1 --> Row ID
+     * 2 --> Tokens
+     */
+    val map = testDF.rdd.map { row =>
+      if (this.evaluateSentence(trees, row(2).asInstanceOf[Seq[String]], categoryCounts)
+        .equals(row(0).asInstanceOf[String]))
+        ("correct", 1.0)
+      else
+        ("wrong", 1.0)
+    }
+      .reduceByKey(_ + _)
+      .collectAsMap()
+
+    println("Accuracy: " + (map("correct") / (map("correct") + map("wrong"))) + "%")
   }
 }
