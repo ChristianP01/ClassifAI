@@ -90,6 +90,6 @@ object AlgorithmUtils extends Serializable {
       .reduceByKey(_ + _)
       .collectAsMap()
 
-    println("Accuracy: " + (map("correct") / (map("correct") + map("wrong"))) + "%")
+    println("Accuracy: " + (map("correct") / (map("correct") + map("wrong"))))
   }
 }
