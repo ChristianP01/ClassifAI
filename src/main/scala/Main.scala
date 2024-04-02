@@ -57,6 +57,7 @@ object Main {
     val treeMaxDepth: Int = args_map.getOrElse("treeMaxDepth", 20).toString.toInt
 
     println(DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()) + " Arguments selected:" +
+      "\nlocalExec" + localExec.toString +
       "\nactualPath --> " + actualPath +
       "\ncomputeDF --> " + computeDF.toString +
       "\nminOccurs --> " + minWordOccurrences +
