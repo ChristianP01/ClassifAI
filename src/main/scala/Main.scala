@@ -5,6 +5,7 @@ import data.{DataframeCleaner, TopicIndex}
 import model.Node
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, when}
+import org.sparkproject.dmg.pmml.True
 
 import java.io._
 import java.nio.file.{Files, Paths}
@@ -22,11 +23,16 @@ object Main {
       (argSplit(0), argSplit(1))
     }.toMap
 
+    /** true -> execute in local
+     * false -> execute in cloud
+     * defaults to true
+     * */
+    val localExec: Boolean = args_map.getOrElse("localExec", true).toString.toBoolean
+
     /** Path to resources */
     val actualPath: String = args_map.getOrElse("actualPath", System.getProperty("user.dir") + "/src/main/assets")
 
-    /**
-     * true -> preprocess and save a new dataset
+    /** true -> preprocess and save a new dataset
      * false -> load a previous preprocessed dataset
      * Defaults to true
      * */
@@ -35,15 +41,13 @@ object Main {
     /** Set the minimum occurrences a word must have in the dataset to being used as an attribute */
     val minWordOccurrences: Int = args_map.getOrElse("minOccurs", 200).toString.toInt
 
-    /**
-     * true -> utilizes map-reduce algorithm
+    /** true -> utilizes map-reduce algorithm
      * false -> utilizes sequential algorithm
      * Defaults to true
      * */
     val mapReduce: Boolean = args_map.getOrElse("mapReduce", true).toString.toBoolean
 
-    /**
-     * true -> generates new trees and save them
+    /** true -> generates new trees and save them
      * false -> load previous generated trees
      * Defaults to true
      * */
@@ -61,11 +65,17 @@ object Main {
       "\ntreeMaxDepth --> " + treeMaxDepth)
 
     /** Start Spark session */
-    val spark = SparkSession
-      .builder
-      .appName("ClassifAI")
-      .master("local[*]")
-      .getOrCreate()
+    val spark = if (localExec)
+      SparkSession
+        .builder
+        .appName("ClassifAI")
+        .master("local[*]")
+        .getOrCreate()
+    else
+      SparkSession
+        .builder
+        .appName("ClassifAI")
+        .getOrCreate()
 
     if (computeDF) {
       /** Upload dataframe */
