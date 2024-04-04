@@ -43,30 +43,34 @@ class SeqAlgorithm(spark: SparkSession, maxDepth: Int = 20) {
       /** Data frame category count with attribute's value 0 (complementary of 1) */
       val df0CategoryCount = countCategory - df1CategoryCount
 
-      /** Entropy of label in data frame with attribute's value 1 */
-      val entropyA1 = AlgorithmUtils.calcEntropy(df1CategoryCount, df1Count)
-      /** Entropy of label in data frame with attribute's value 0 */
-      val entropyA0 = AlgorithmUtils.calcEntropy(df0CategoryCount, df0Count)
+      /** Check if this attribute is significant */
+      if (df1Count > 0.0 && df0Count > 0.0) {
+        /** Entropy of label in data frame with attribute's value 1 */
+        val entropyA1 = AlgorithmUtils.calcEntropy(df1CategoryCount, df1Count)
+        /** Entropy of label in data frame with attribute's value 0 */
+        val entropyA0 = AlgorithmUtils.calcEntropy(df0CategoryCount, df0Count)
 
-      val info = ((df1Count / dfCount) * entropyA1) + ((df0Count / dfCount) * entropyA0)
-      val splitInfo = AlgorithmUtils.entropyFormula(df1Count / dfCount) +
-        AlgorithmUtils.entropyFormula(df0Count / dfCount)
+        val info = ((df1Count / dfCount) * entropyA1) + ((df0Count / dfCount) * entropyA0)
+        val splitInfo = AlgorithmUtils.entropyFormula(df1Count / dfCount) +
+          AlgorithmUtils.entropyFormula(df0Count / dfCount)
 
-      /** Gain ratio of attribute */
-      val gainRatio = (entropyGeneral - info) / splitInfo
+        /** Gain ratio of attribute */
+        val gainRatio = (entropyGeneral - info) / splitInfo
 
-      if (gainRatio > maxGainRatio) {
-        maxGainRatio = gainRatio
-        aBest = attribute
-        leftDF = df1.drop(aBest)
-        leftCount = df1Count
-        leftCategoryCount = df1CategoryCount
+        if (gainRatio > maxGainRatio) {
+          maxGainRatio = gainRatio
+          aBest = attribute
+          leftDF = df1.drop(aBest)
+          leftCount = df1Count
+          leftCategoryCount = df1CategoryCount
+        }
       }
     }
 
     val rightDF = df.where(df.col(aBest) === 0).drop(aBest)
 
-    if (leftDF.isEmpty || rightDF.isEmpty)
+    /** Check if one split is empty or aBest is irrelevant */
+    if (leftDF.isEmpty || rightDF.isEmpty || maxGainRatio <= 0.0)
       LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
     else {
       val leftChild = this.generateTree(leftDF, leftCount, leftCategoryCount, actualDepth + 1, category)
