@@ -67,10 +67,14 @@ class SeqAlgorithm(spark: SparkSession, maxDepth: Int = 20) {
       }
     }
 
+    /** Check if aBest is irrelevant */
+    if (aBest == "" || maxGainRatio <= 0.0)
+      return LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
+
     val rightDF = df.where(df.col(aBest) === 0).drop(aBest)
 
-    /** Check if one split is empty or aBest is irrelevant */
-    if (leftDF.isEmpty || rightDF.isEmpty || maxGainRatio <= 0.0)
+    /** Check if one split is empty */
+    if (leftDF.isEmpty || rightDF.isEmpty)
       LeafNode(AlgorithmUtils.getMajorLabelByCount(dfCount, countCategory, category))
     else {
       val leftChild = this.generateTree(leftDF, leftCount, leftCategoryCount, actualDepth + 1, category)
