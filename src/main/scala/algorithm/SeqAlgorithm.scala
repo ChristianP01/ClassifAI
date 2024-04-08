@@ -5,8 +5,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class SeqAlgorithm(spark: SparkSession, maxDepth: Int = 20) {
 
-  /**
-   * Recursive methods -> evaluate best attribute and generate link between attributes
+  /** Recursive methods -> evaluate best attribute and generate link between attributes
+   *
    * @param df sub data frame
    * @param dfCount total number of rows
    * @param countCategory number of rows with correct category label

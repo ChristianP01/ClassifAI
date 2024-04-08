@@ -73,8 +73,13 @@ object AlgorithmUtils extends Serializable {
     }
   }
 
+  /** Predict labels for test data frame and evaluate accuracy score
+   *
+   * @param testDF DataFrame - test data frame
+   * @param trees Map[String, Node] - decision trees
+   * @param categoryCounts Map[String, Double] - map of count for each category
+   */
   def calcMetrics(testDF: DataFrame, trees: Map[String, Node], categoryCounts: Map[String, Double]): Unit = {
-
     /** Each row with following format:
      * 0 --> Ground truth
      * 1 --> Row ID

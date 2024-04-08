@@ -6,9 +6,9 @@ import org.apache.spark.sql.DataFrame
 
 class MapReduceAlgorithm(maxDepth: Int = 20) {
 
-  /**
-   * Recursive methods -> evaluate best attribute and generate link between attributes
-   * @param df sub data frame
+  /** Recursive methods -> evaluate best attribute and generate link between attributes
+   *
+   *  @param df sub data frame
    * @param dfCount total number of rows
    * @param countCategory number of rows with correct category label
    * @param actualDepth tree depth

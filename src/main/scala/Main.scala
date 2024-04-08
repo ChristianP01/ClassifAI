@@ -5,7 +5,6 @@ import data.{DataframeCleaner, TopicIndex}
 import model.Node
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, when}
-import org.sparkproject.dmg.pmml.True
 
 import java.io._
 import java.nio.file.{Files, Paths}
@@ -70,7 +69,6 @@ object Main {
       SparkSession
         .builder
         .appName("ClassifAI")
-        .master("local[*]")
         .getOrCreate()
     else
       SparkSession
