@@ -68,6 +68,7 @@ object Main {
     val spark = if (localExec)
       SparkSession
         .builder
+        .master("local[*]")
         .appName("ClassifAI")
         .getOrCreate()
     else
